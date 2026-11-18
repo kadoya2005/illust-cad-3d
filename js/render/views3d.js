@@ -55,7 +55,7 @@ function solidMesh(it) {
   const key = JSON.stringify(it.subs) + it.rule + it.x3d.z0 + ',' + it.x3d.h;
   let m = V3.meshes.get(it.id);
   if (m && m.key === key) return m;
-  if (m) disposeMesh(m);
+  if (m) { if (m.group.parent) m.group.parent.remove(m.group); disposeMesh(m); }   // 古いものを scene から外してから捨てる（残すと跡のように見える）
   const tris = solidTriangles(it);
   const pos = new Float32Array(tris.length * 9);
   let o = 0;
@@ -147,13 +147,16 @@ function renderViews() {
   const bb = all.length ? Geo.bbox(all) : null;
   const xr = [Math.min(0, bb ? bb.x : 0), Math.max(doc.width, bb ? bb.x + bb.w : 0)];
   const yr = [Math.min(0, bb ? bb.y : 0), Math.max(doc.height, bb ? bb.y + bb.h : 0)];
-  const center = new THREE.Vector3((xr[0] + xr[1]) / 2, (zMin + zMax) / 2, (yr[0] + yr[1]) / 2);
+  let center = new THREE.Vector3((xr[0] + xr[1]) / 2, (zMin + zMax) / 2, (yr[0] + yr[1]) / 2);
   let scale = Infinity;
   for (const v of VIEWS) {
     const r = V3.views[v.id].box.getBoundingClientRect();
     const span = v.id === 'viewFront' ? xr[1] - xr[0] : yr[1] - yr[0];
     scale = Math.min(scale, (r.width - 48) / Math.max(1, span), (r.height - 56) / Math.max(1, zMax - zMin));
   }
+  // ドラッグ中は、縮尺と中心を始めたときのままにする（形が大きくなっても画面が縮まないように）
+  if (V3.hold) { scale = V3.hold.scale; center = V3.hold.center.clone(); }
+  else V3.fit = { scale, center: center.clone() };
   if (!(scale > 0) || !isFinite(scale)) return;
   scale *= V3.k;
   V3.scale = scale;
@@ -323,6 +326,7 @@ function snapZ(d, edges, dz, e) {
 function startViewXf(id, kind, handle, q) {
   const sr = selRange();
   if (!sr) return null;
+  if (V3.fit) V3.hold = V3.fit;   // ドラッグが終わるまで画面の縮尺を変えない
   return {
     type: 'vxf', kind, handle, view: id, s: q, sr, moved: false,
     subs: snapshotSel(),
@@ -392,10 +396,10 @@ function moveViewXf(d, q, e) {
       for (const it of items) {
         if (!it.x3d) continue;
         const z0 = aZ + (it.x3d.z0 - aZ) * kz, z1 = aZ + (it.x3d.z0 + it.x3d.h - aZ) * kz;
-        it.x3d = { z0: Math.min(z0, z1), h: Math.max(0.1, Math.abs(z1 - z0)) };
+        it.x3d = { ...it.x3d, z0: Math.min(z0, z1), h: Math.max(0.1, Math.abs(z1 - z0)) };
       }
     }
-    if (create) for (const it of items) if (it.subs.some((sb) => sb.closed && sb.nodes.length >= 2)) it.x3d = { z0: zMin, h: dzc };
+    if (create) for (const it of items) if (it.subs.some((sb) => sb.closed && sb.nodes.length >= 2)) it.x3d = { ...(it.x3d || {}), z0: zMin, h: dzc };
     const nr = selRange();
     const w = ax === 'x' ? nr.bb.w : nr.bb.h;
     tip = `${ax === 'x' ? '幅' : '奥行き'} ${r2(w)} pt　高さ ${r2(nr.zMax - nr.zMin)} pt`;
@@ -404,7 +408,8 @@ function moveViewXf(d, q, e) {
   render(); updateUI();
 }
 function endViewXf(d) {
-  if (!d.moved) return;
+  V3.hold = null;
+  if (!d.moved) { renderViews(); return; }
   const x = selectedItems().find((it) => it.x3d);
   if (x) S.lastExH = x.x3d.h;
   render(); commit();

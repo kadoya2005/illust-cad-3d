@@ -17,7 +17,7 @@ function setExtrude(h, z0) {
   if (!ls.length) { toast('閉じたパスを選んでください（開いたパスは押し出せません）'); return; }
   for (const it of ls) {
     const cur = it.x3d || { z0: 0, h: S.lastExH || X3D_DEFAULT_H };
-    it.x3d = { z0: isFinite(z0) ? z0 : cur.z0, h: isFinite(h) && h > 0 ? h : cur.h };
+    it.x3d = { ...cur, z0: isFinite(z0) ? z0 : cur.z0, h: isFinite(h) && h > 0 ? h : cur.h };
   }
   S.lastExH = ls[0].x3d.h;
   render(); commit();
