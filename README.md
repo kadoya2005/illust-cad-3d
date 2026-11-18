@@ -22,6 +22,8 @@ Adobe Illustrator とは関係のない、非公式のツールです。
 ### 3D（段階1）
 - 画面は三面図：左が **平面図**（いつもの 2D の画面）、右上が **正面図**、右下が **側面図**（右から見た図）
 - 閉じたパスを選んで、パネルの「3D 押し出し」で **高さ** と **底**（床から浮かせる高さ）を入れると立体になる
+- 正面図・側面図の操作：Space＋ドラッグで動かす、Alt＋ホイールで拡大・縮小、クリックで立体を選ぶ
+- **Shift＋Space＋ドラッグで回して見られる（3D 手のひら）**。ドラッグ中に Shift を押していると 15° ずつ。ダブルクリックで正面・側面に戻る（Ctrl+0 で全部戻る）
 - 正面図・側面図は 表示 → 正面図・側面図 でしまえる
 - 押し出しは、コピー・複製・保存（.icad と SVG）でそのまま付いてくる（イラレで開いて保存すると消えます）
 
@@ -47,7 +49,7 @@ Adobe Illustrator とは関係のない、非公式のツールです。
 
 - 文字、画像、グラデーション（読み込むときは飛ばします）
 - シェイプ形成ツール、ライブコーナー、パスの単純化
-- 3D の続き：正面図・側面図でドラッグして押し出す、回して見る 3D 表示、正面図・側面図でのペン、3D バケツ、回転体
+- 3D の続き：正面図・側面図でドラッグして押し出す、正面図・側面図でのペン、3D バケツ、回転体
 - Ctrl+N・Ctrl+W・Ctrl+T（ブラウザが使っているキーなので取れません）
 
 ## プログラムの構成
@@ -72,12 +74,13 @@ Adobe Illustrator とは関係のない、非公式のツールです。
 | | `solids.js` | 3D の押し出し（輪郭づくり、三角形に分ける） |
 | `js/render/` | `view.js` | 画面への描画（作品・選択の表示・定規・グリッド） |
 | | `hittest.js` | 当たり判定 |
-| | `views3d.js` | 正面図・側面図 |
+| | `views3d.js` | 正面図・側面図（three.js で描く、回す・動かす・選ぶ） |
 | `js/tools/` | `drag.js` / `transform.js` / `shapes.js` / `tools.js` | 各ツールの動き |
 | `js/ui/` | `mouse.js` / `keyboard.js` / `panels.js` / `dialogs.js` / `help.js` | マウス、キーボード、パネル、ダイアログ、一覧 |
 | `js/io/` | `svgio.js` / `files.js` / `clipboard.js` / `stl.js` | SVG、ファイル、クリップボード、STL |
 | `js/vendor/` | `paper-core.min.js` | [paper.js](http://paperjs.org/) 0.12.18（MIT ライセンス） |
 | | `clipper.js` | [clipper-lib](https://www.npmjs.com/package/clipper-lib) 6.4.2（Boost Software License） |
+| | `three.min.js` | [three.js](https://threejs.org/) r149（MIT ライセンス）。正面図・側面図の 3D 表示 |
 | `js/` | `app.js` | 起動 |
 
 ### データの形（`.icad`）
