@@ -128,6 +128,7 @@ function updateCursor() {
   else if (overHandle(t)) c = HANDLE_CURSOR;
   else if (t === 'select') c = SELECT_CURSOR;
   else if (t === 'direct') c = DIRECT_CURSOR;
+  else if (t === 'rotView') c = ROTATE_CURSORS.ne;
   else if (t === 'hand') c = S.drag && S.drag.type === 'pan' ? 'grabbing' : 'grab';
   else if (t === 'zoom') c = S.keys.alt ? 'zoom-out' : 'zoom-in';
   else if (!SEL_TOOLS.has(t)) c = 'crosshair';

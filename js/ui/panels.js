@@ -25,7 +25,7 @@ const MENUS = {
     ['隠す', 'Ctrl+3', hideSelection], ['すべてを表示', 'Ctrl+Alt+3', showAll],
   ],
   view: [
-    ['アウトライン', 'Ctrl+Y', toggleOutline, () => S.outline], ['アートボード全体', 'Ctrl+0', fitView], ['100%', 'Ctrl+1', () => zoomAt(stageCenter(), 1)], '-',
+    ['アウトライン', 'Ctrl+Y', toggleOutline, () => S.outline], ['アートボード全体', 'Ctrl+0', fitView], ['100%', 'Ctrl+1', () => zoomAt(stageCenter(), 1)], ['回転ビューをリセット', 'Ctrl+Shift+1', resetViewRotation], '-',
     ['境界線を隠す', 'Ctrl+H', () => { S.hideEdges = !S.hideEdges; drawOverlay(); }, () => S.hideEdges],
     ['正面図・側面図', '', toggle3dViews, () => S.show3d],
     ['定規', 'Ctrl+R', toggleRulers, () => S.rulers], ['スマートガイド', 'Ctrl+U', toggleSmart, () => S.smart], '-',
@@ -250,3 +250,6 @@ const COMMANDS = {
   undo, redo, outline: toggleOutline, fit: fitView, help: () => toggleHelp(true), prefs: openPrefs,
 };
 document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () => COMMANDS[b.dataset.cmd]()));
+
+// 表示倍率の横の「↻30°」をクリックすると、回転ビューをリセット
+$('zoomLabel').addEventListener('click', () => { if (viewDeg()) resetViewRotation(); });

@@ -65,6 +65,7 @@ document.addEventListener('keydown', (e) => {
     else if (kc === '2') { if (alt) unlockAll(); else lockSelection(); }
     else if (kc === '3') { if (alt) showAll(); else hideSelection(); }
     else if (kc === '0') fitView();
+    else if (kc === '1' && sh && !alt) resetViewRotation();   // 回転ビューをリセット（イラレと同じ）
     else if (kc === '1' && !alt) zoomAt(stageCenter(), 1);
     else if (plus) zoomStep(1);
     else if (minus) zoomStep(-1);

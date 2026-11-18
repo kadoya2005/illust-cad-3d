@@ -55,7 +55,9 @@ input[type=color].none { opacity: .35; }
 .menu { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
 .menu button { white-space: nowrap; flex-shrink: 0; }
 .menu .sep { width: 1px; height: 18px; background: #555; margin: 0 4px; }
-#zoomLabel { color: var(--muted); margin-left: 6px; min-width: 48px; }
+#zoomLabel { color: var(--muted); margin-left: 6px; min-width: 48px; white-space: nowrap; }
+#zoomLabel.rotated { color: #ffd479; cursor: pointer; }
+#zoomLabel.rotated:hover { text-decoration: underline; }
 #topbar .right { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 #fileName { color: var(--muted); max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 

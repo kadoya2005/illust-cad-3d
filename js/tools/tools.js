@@ -273,6 +273,17 @@ const Tools = {
     },
   },
 
+  // 回転ビュー（Shift+Space を押している間）：画面の真ん中を中心に回す。Shift で 15° ずつ
+  rotView: {
+    down(e, p, sp) { const c = stageCenter(); S.drag = { type: 'rotView', c, a0: Math.atan2(sp.y - c.y, sp.x - c.x), r0: view.r }; updateCursor(); },
+    move(e, p, sp) {
+      const d = S.drag;
+      let r = d.r0 + Math.atan2(sp.y - d.c.y, sp.x - d.c.x) - d.a0;
+      if (e.shiftKey) r = snapAngle(r, Math.PI / 12);
+      setViewRotation(r);
+    },
+    up() { updateUI(); },
+  },
   hand: {
     down(e, p, sp) { S.drag = { type: 'pan', s: sp, vx: view.x, vy: view.y }; updateCursor(); },
     move(e, p, sp) { const d = S.drag; view.x = d.vx + sp.x - d.s.x; view.y = d.vy + sp.y - d.s.y; renderView(); },

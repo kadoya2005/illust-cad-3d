@@ -30,13 +30,22 @@ function hitHandle(sp) {
   for (const h of S.handleHits) { const d = Math.hypot(h.x - sp.x, h.y - sp.y); if (d <= bd) { bd = d; best = h; } }
   return best;
 }
-function hitBBoxHandle(sp) { const h = S.bboxHits.find((b) => Math.abs(b.x - sp.x) <= 5 && Math.abs(b.y - sp.y) <= 5); return h ? h.id : null; }
+// バウンディングボックスの取っ手（いちばん近いもの。小さい図形で隣の取っ手を拾わないように）
+function hitBBoxHandle(sp) {
+  let best = null, bd = Infinity;
+  for (const b of S.bboxHits) {
+    if (Math.abs(b.x - sp.x) > 5 || Math.abs(b.y - sp.y) > 5) continue;
+    const d = Math.hypot(b.x - sp.x, b.y - sp.y);
+    if (d < bd) { bd = d; best = b; }
+  }
+  return best ? best.id : null;
+}
 // バウンディングボックスの四隅の少し外側（回転）。返すのは角の名前（nw / ne / se / sw）
 function hitBBoxRotate(sp) {
-  const nw = S.bboxHits.find((b) => b.id === 'nw'), se = S.bboxHits.find((b) => b.id === 'se');
-  if (!nw || !se) return null;
-  const inside = sp.x > nw.x && sp.x < se.x && sp.y > nw.y && sp.y < se.y;
-  if (inside) return null;
+  const bb = S.bboxDoc;
+  if (!bb || !S.bboxHits.length) return null;
+  const q = toDoc(sp);   // 回転ビューでも合うように、文書の座標で「枠の中か」を見る
+  if (q.x > bb.x && q.x < bb.x + bb.w && q.y > bb.y && q.y < bb.y + bb.h) return null;
   for (const id of ['nw', 'ne', 'se', 'sw']) {
     const c = S.bboxHits.find((b) => b.id === id);
     if (c && Math.hypot(c.x - sp.x, c.y - sp.y) <= 18) return id;
@@ -47,7 +56,8 @@ function hitGuide(sp) {
   if (!S.showGuides || S.guidesLocked) return -1;
   for (let i = doc.guides.length - 1; i >= 0; i--) {
     const g = doc.guides[i];
-    const d = g.axis === 'x' ? Math.abs(toScr(P(g.v, 0)).x - sp.x) : Math.abs(toScr(P(0, g.v)).y - sp.y);
+    const q = toDoc(sp);
+    const d = Math.abs((g.axis === 'x' ? q.x : q.y) - g.v) * view.z;
     if (d <= 3) return i;
   }
   return -1;

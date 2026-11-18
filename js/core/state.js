@@ -19,7 +19,7 @@ function newDoc() {
 }
 
 let doc = newDoc();
-const view = { x: 0, y: 0, z: 1 };
+const view = { x: 0, y: 0, z: 1, r: 0 };   // r：回転ビューの角度（ラジアン、時計回りが +）
 const S = {
   tool: 'select', lastSelTool: 'select', activeTool: null,
   sel: new Map(),            // パスID → 選択中アンカーのキー集合 "サブパス番号,アンカー番号"

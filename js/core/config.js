@@ -26,6 +26,7 @@ const TOOLS_META = {
   eyedropper: { name: 'スポイトツール', key: 'I', hint: 'クリックしたオブジェクトの塗りと線を、選択中のものに写す' },
   hand: { name: '手のひらツール', key: 'H', hint: 'ドラッグで表示位置を動かす（Space を押している間も使えます）' },
   zoom: { name: 'ズームツール', key: 'Z', hint: 'クリックで拡大／Alt+クリックで縮小' },
+  rotView: { name: '回転ビュー', key: 'Shift+Space', hint: 'ドラッグで画面を回す（Shift で 15° ずつ）／Ctrl+Shift+1 で元に戻す' },
 };
 const ZOOMS = [0.03125, 0.0625, 0.125, 0.1667, 0.25, 0.3333, 0.5, 0.6667, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
 const AUTOSAVE_DOC = 'illustcad.autosave.doc';

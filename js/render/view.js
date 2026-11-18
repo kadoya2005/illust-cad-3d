@@ -3,15 +3,24 @@
 
 // ================= 表示 =================
 function evScr(e) { const r = stage.getBoundingClientRect(); return P(e.clientX - r.left, e.clientY - r.top); }
-const toDoc = (s) => P((s.x - view.x) / view.z, (s.y - view.y) / view.z);
-const toScr = (p) => P(p.x * view.z + view.x, p.y * view.z + view.y);
+// 画面 ＝ 平行移動 ＋ 回転 ＋ 拡大（view.r が 0 なら、今までどおり）
+const toDoc = (s) => {
+  const dx = s.x - view.x, dy = s.y - view.y, c = Math.cos(view.r), n = Math.sin(view.r);
+  return P((dx * c + dy * n) / view.z, (-dx * n + dy * c) / view.z);
+};
+const toScr = (p) => {
+  const c = Math.cos(view.r), n = Math.sin(view.r), x = p.x * view.z, y = p.y * view.z;
+  return P(x * c - y * n + view.x, x * n + y * c + view.y);
+};
+// 回転・拡大を変えたあと、文書の点 d が画面の sp に来るように平行移動を決める
+function placeDocAt(d, sp) { view.x = 0; view.y = 0; const q = toScr(d); view.x = sp.x - q.x; view.y = sp.y - q.y; }
 const tol = () => 5 / view.z;
 function stageCenter() { const r = stage.getBoundingClientRect(); return P(r.width / 2, r.height / 2); }
 
 function zoomAt(sp, nz) {
   nz = Math.min(64, Math.max(0.03125, nz));
   const d = toDoc(sp);
-  view.z = nz; view.x = sp.x - d.x * nz; view.y = sp.y - d.y * nz;
+  view.z = nz; placeDocAt(d, sp);
   renderView();
 }
 function zoomStep(dir, sp) {
@@ -22,8 +31,11 @@ function fitView() {
   const r = stage.getBoundingClientRect();
   if (!r.width || !r.height) return;
   const m = 40 + (S.rulers ? RULER : 0);
-  const z = Math.max(0.03125, Math.min((r.width - 2 * m) / doc.width, (r.height - 2 * m) / doc.height));
-  view.z = z; view.x = (r.width - doc.width * z) / 2; view.y = (r.height - doc.height * z) / 2;
+  // 回転していても入るように、回したアートボードの幅・高さで考える
+  const c = Math.abs(Math.cos(view.r)), n = Math.abs(Math.sin(view.r));
+  const bw = doc.width * c + doc.height * n, bh = doc.width * n + doc.height * c;
+  view.z = Math.max(0.03125, Math.min((r.width - 2 * m) / bw, (r.height - 2 * m) / bh));
+  placeDocAt(P(doc.width / 2, doc.height / 2), P(r.width / 2, r.height / 2));
   if (typeof fitViews3d === 'function') fitViews3d();   // 正面図・側面図も元の大きさに
   renderView();
 }
@@ -48,7 +60,8 @@ function renderArt() {
 function renderGrid() {
   if (!S.grid) { gridG.innerHTML = ''; return; }
   const r = stage.getBoundingClientRect();
-  const a = toDoc(P(0, 0)), b = toDoc(P(r.width, r.height));
+  const cs = [P(0, 0), P(r.width, 0), P(0, r.height), P(r.width, r.height)].map(toDoc);
+  const a = P(Math.min(...cs.map((q) => q.x)), Math.min(...cs.map((q) => q.y))), b = P(Math.max(...cs.map((q) => q.x)), Math.max(...cs.map((q) => q.y)));
   let major = GRID_MAJOR;
   while (major * view.z < 12) major *= 2;
   const minor = GRID_MAJOR / GRID_DIV;
@@ -71,6 +84,12 @@ function drawRuler(cv, w, h, axis) {
   const g = cv.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = '#3a3a3a'; g.fillRect(0, 0, w, h);
+  if (Math.abs(view.r) > 1e-9) {
+    // 回転しているときは目盛りを出さない
+    g.fillStyle = '#9a9a9a'; g.font = '9px system-ui, sans-serif';
+    if (axis === 'x') g.fillText('回転ビュー中（Ctrl+Shift+1 で戻す）', 30, 13);
+    return;
+  }
   const z = view.z, off = axis === 'x' ? view.x : view.y, len = axis === 'x' ? w : h;
   const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
   const major = steps.find((s) => s * z >= 50) || 20000;
@@ -107,10 +126,27 @@ function drawRulers() {
   drawRuler($('rulerTop'), r.width, RULER, 'x');
   drawRuler($('rulerLeft'), RULER, r.height, 'y');
 }
+// 回転ビューの角度（度、-179〜180）
+const viewDeg = () => Math.round(((((view.r * 180) / Math.PI) % 360) + 540) % 360 - 180);
+// 画面の真ん中を中心に回す
+function setViewRotation(rad) {
+  const c = stageCenter(), d = toDoc(c);
+  view.r = rad;
+  placeDocAt(d, c);
+  renderView();
+}
+// 回転ビューをリセット（イラレと同じ Ctrl+Shift+1）。正面図・側面図の回転も戻す
+function resetViewRotation() {
+  setViewRotation(0);
+  if (typeof V3 !== 'undefined') { for (const v of VIEWS) V3.rot[v.id] = { yaw: v.yaw, pitch: 0 }; renderViews(); }
+}
 function renderView() {
-  world.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.z})`);
+  world.setAttribute('transform', `translate(${view.x} ${view.y}) rotate(${(view.r * 180) / Math.PI}) scale(${view.z})`);
   for (const r of [board, boardEdge]) { r.setAttribute('width', doc.width); r.setAttribute('height', doc.height); }
-  $('zoomLabel').textContent = Math.round(view.z * 1000) / 10 + '%';
+  const deg = viewDeg();
+  $('zoomLabel').textContent = Math.round(view.z * 1000) / 10 + '%' + (deg ? `　↻${deg}°` : '');
+  $('zoomLabel').title = deg ? 'クリックで回転ビューをリセット（Ctrl+Shift+1）' : '';
+  $('zoomLabel').classList.toggle('rotated', !!deg);
   renderGrid(); drawRulers(); drawOverlay();
 }
 function render() { renderArt(); renderView(); }
@@ -119,7 +155,7 @@ function render() { renderArt(); renderView(); }
 //   Space → 手のひら／Ctrl+Space → ズーム／Ctrl → 最後に使った選択ツール
 //   Alt：アンカー追加 ⇔ アンカー削除（ペン＋Alt のアンカーポイントツールは、ペンの中で扱う）
 function tempTool(ctrl, alt) {
-  if (S.spaceDown) return ctrl ? 'zoom' : 'hand';
+  if (S.spaceDown) return ctrl ? 'zoom' : S.keys.shift ? 'rotView' : 'hand';   // Shift+Space：回転ビュー（イラレと同じ）
   if (ctrl && !SEL_TOOLS.has(S.tool)) return S.lastSelTool;
   // 選択ツール ⇄ ダイレクト選択ツール：Ctrl を押している間だけ入れ替わる（イラレと同じ）
   if (ctrl && S.tool === 'select') return 'direct';
@@ -134,26 +170,39 @@ function displayTool() {
 }
 function effectiveTool(e) { return tempTool(e.ctrlKey || e.metaKey, e.altKey); }
 
+// ガイド（文書の縦線・横線）を、画面の端から端まで
+function guideLine(axis, v, attrs) {
+  const L = 1e6;
+  const a = toScr(axis === 'x' ? P(v, -L) : P(-L, v)), b = toScr(axis === 'x' ? P(v, L) : P(L, v));
+  return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" ${attrs}/>`;
+}
+// 文書の四角を、画面の上の多角形に（回転ビューでは傾いて見える）
+function docRectPts(bb, pad) {
+  const c = [P(bb.x, bb.y), P(bb.x + bb.w, bb.y), P(bb.x + bb.w, bb.y + bb.h), P(bb.x, bb.y + bb.h)].map(toScr);
+  if (pad) {
+    const m = P((c[0].x + c[2].x) / 2, (c[0].y + c[2].y) / 2);
+    c.forEach((q, i) => { const v = vsub(q, m), l = vlen(v) || 1; c[i] = vadd(q, vmul(v, pad / l)); });
+  }
+  return c.map((q) => `${q.x},${q.y}`).join(' ');
+}
 function drawOverlay() {
   const t = displayTool();
   const nodeTool = NODE_TOOLS.has(t);
   const sp = toScr;
   const r = stage.getBoundingClientRect();
   let h = '';
-  S.handleHits = []; S.bboxHits = [];
+  S.handleHits = []; S.bboxHits = []; S.bboxDoc = null;
 
   // ガイド
   if (S.showGuides) {
     doc.guides.forEach((g, i) => {
       const col = i === S.selGuide ? '#0060ff' : GUIDE_COLOR;
-      if (g.axis === 'x') { const x = sp(P(g.v, 0)).x; h += `<line x1="${x}" y1="0" x2="${x}" y2="${r.height}" stroke="${col}" stroke-width="1"/>`; }
-      else { const y = sp(P(0, g.v)).y; h += `<line x1="0" y1="${y}" x2="${r.width}" y2="${y}" stroke="${col}" stroke-width="1"/>`; }
+      h += guideLine(g.axis, g.v, `stroke="${col}" stroke-width="1"`);
     });
   }
   if (S.drag && S.drag.type === 'guideNew' && S.drag.v != null) {
     const g = S.drag;
-    if (g.axis === 'x') { const x = sp(P(g.v, 0)).x; h += `<line x1="${x}" y1="0" x2="${x}" y2="${r.height}" stroke="${GUIDE_COLOR}" stroke-dasharray="4 3"/>`; }
-    else { const y = sp(P(0, g.v)).y; h += `<line x1="0" y1="${y}" x2="${r.width}" y2="${y}" stroke="${GUIDE_COLOR}" stroke-dasharray="4 3"/>`; }
+    h += guideLine(g.axis, g.v, `stroke="${GUIDE_COLOR}" stroke-dasharray="4 3"`);
   }
 
   // マウスの下にあるもの（選択ツールではグループ全体）
@@ -207,12 +256,12 @@ function drawOverlay() {
     const bb = Geo.bbox(items);
     if (bb) {
       const col = findItem(items[0].id).layer.color;
-      const a = sp(P(bb.x, bb.y)), b = sp(P(bb.x + bb.w, bb.y + bb.h));
-      const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y), x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
-      h += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="none" stroke="${col}" stroke-width="1"/>`;
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const pts = { nw: [a.x, a.y], n: [mx, a.y], ne: [b.x, a.y], e: [b.x, my], se: [b.x, b.y], s: [mx, b.y], sw: [a.x, b.y], w: [a.x, my] };
-      for (const [id, [x, y]] of Object.entries(pts)) {
+      S.bboxDoc = bb;
+      h += `<polygon points="${docRectPts(bb)}" fill="none" stroke="${col}" stroke-width="1"/>`;
+      const X0 = bb.x, X1 = bb.x + bb.w, Y0 = bb.y, Y1 = bb.y + bb.h, MX = bb.x + bb.w / 2, MY = bb.y + bb.h / 2;
+      const dp = { nw: [X0, Y0], n: [MX, Y0], ne: [X1, Y0], e: [X1, MY], se: [X1, Y1], s: [MX, Y1], sw: [X0, Y1], w: [X0, MY] };
+      for (const [id, [dx, dy]] of Object.entries(dp)) {
+        const { x, y } = sp(P(dx, dy));
         h += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="#fff" stroke="${col}" stroke-width="1"/>`;
         S.bboxHits.push({ id, x, y });
       }
@@ -223,8 +272,7 @@ function drawOverlay() {
     const f = findItem(S.keyId);
     const bb = f && Geo.bbox(leaves([f.item]));
     if (bb) {
-      const a = sp(P(bb.x, bb.y)), b = sp(P(bb.x + bb.w, bb.y + bb.h));
-      h += `<rect x="${a.x - 2}" y="${a.y - 2}" width="${b.x - a.x + 4}" height="${b.y - a.y + 4}" fill="none" stroke="${f.layer.color}" stroke-width="3"/>`;
+      h += `<polygon points="${docRectPts(bb, 2.8)}" fill="none" stroke="${f.layer.color}" stroke-width="3"/>`;
     }
   }
   // 回転・リフレクト・拡大縮小の基準点
@@ -240,8 +288,9 @@ function drawOverlay() {
     }
   }
   if (S.marquee) {
-    const a = sp(S.marquee.a), b = sp(S.marquee.b);
-    h += `<rect x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}" fill="rgba(79,128,255,0.08)" stroke="#4f80ff" stroke-dasharray="3 3"/>`;
+    const { a, b } = S.marquee;
+    const mb = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+    h += `<polygon points="${docRectPts(mb)}" fill="rgba(79,128,255,0.08)" stroke="#4f80ff" stroke-dasharray="3 3"/>`;
   }
   // ペンのラバーバンド（次の線のプレビュー）
   if (t === 'pen' && S.drawing && !S.drag && S.mouseScr) {
