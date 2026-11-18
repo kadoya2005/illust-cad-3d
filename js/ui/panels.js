@@ -27,6 +27,7 @@ const MENUS = {
   view: [
     ['アウトライン', 'Ctrl+Y', toggleOutline, () => S.outline], ['アートボード全体', 'Ctrl+0', fitView], ['100%', 'Ctrl+1', () => zoomAt(stageCenter(), 1)], '-',
     ['境界線を隠す', 'Ctrl+H', () => { S.hideEdges = !S.hideEdges; drawOverlay(); }, () => S.hideEdges],
+    ['正面図・側面図', '', toggle3dViews, () => S.show3d],
     ['定規', 'Ctrl+R', toggleRulers, () => S.rulers], ['スマートガイド', 'Ctrl+U', toggleSmart, () => S.smart], '-',
     ['ガイドを表示', 'Ctrl+:', toggleGuides, () => S.showGuides], ['ガイドをロック', 'Ctrl+Alt+:', toggleGuideLock, () => S.guidesLocked], ['ガイドを消去', '', clearGuides], '-',
     ['グリッドを表示', 'Ctrl+@', toggleGrid, () => S.grid], ['グリッドにスナップ', 'Ctrl+Shift+@', toggleSnapGrid, () => S.snapGrid],
@@ -91,6 +92,17 @@ function updateUI() {
   showToolStatus();
   $('alignTo').value = S.alignTo;
   $('btnOffset').disabled = !items.length;
+  // 3D 押し出し：選んだものの値（ばらばらなら空欄）
+  const prof = selectedProfileLeaves();
+  const exs = prof.map((it) => it.x3d || null);
+  const same = (f) => (exs.length && exs.every((e) => e && f(e) === f(exs[0])) ? r2(f(exs[0])) : '');
+  for (const [id, f] of [['inExH', (e) => e.h], ['inExZ', (e) => e.z0]]) {
+    const el = $(id);
+    el.disabled = !prof.length;
+    if (document.activeElement !== el) el.value = same(f);
+  }
+  $('btnExtrude').disabled = !prof.length;
+  $('btnUnextrude').disabled = !exs.some(Boolean);
   const flags = [];
   if (S.smart) flags.push('スマートガイド');
   if (S.snapGrid) flags.push('グリッドにスナップ');
@@ -196,6 +208,10 @@ for (const id of ['inX', 'inY', 'inW', 'inH']) {
     render(); commit();
   });
 }
+$('inExH').addEventListener('change', () => { const v = parseFloat($('inExH').value); if (v > 0) setExtrude(v, undefined); else updateUI(); });
+$('inExZ').addEventListener('change', () => { const v = parseFloat($('inExZ').value); if (isFinite(v)) setExtrude(undefined, v); else updateUI(); });
+$('btnExtrude').addEventListener('click', () => setExtrude(parseFloat($('inExH').value), undefined));
+$('btnUnextrude').addEventListener('click', removeExtrude);
 for (const [id, prop] of [['inBW', 'width'], ['inBH', 'height']]) {
   $(id).addEventListener('change', () => {
     const v = parseFloat($(id).value);
@@ -230,7 +246,7 @@ $('alignTo').addEventListener('change', (e) => {
 $('btnOffset').addEventListener('click', openOffsetDialog);
 
 const COMMANDS = {
-  new: newDocument, open: openFile, save: () => save(false), saveAs: () => save(true), exportSvg: exportSvgFile,
+  new: newDocument, open: openFile, save: () => save(false), saveAs: () => save(true), exportSvg: exportSvgFile, exportStl: exportStlFile,
   undo, redo, outline: toggleOutline, fit: fitView, help: () => toggleHelp(true), prefs: openPrefs,
 };
 document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () => COMMANDS[b.dataset.cmd]()));

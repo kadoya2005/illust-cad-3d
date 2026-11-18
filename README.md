@@ -1,4 +1,4 @@
-# イラレCAD（2D 試作）
+# イラレCAD（3D 試作）
 
 Illustrator と同じショートカットで使える、ベジェ曲線のお絵かきアプリです。
 将来の「パスで形をつくる 3D モデラー」の土台として作っています（構想は [IDEA.md](IDEA.md)）。
@@ -10,6 +10,7 @@ Adobe Illustrator とは関係のない、非公式のツールです。
 `index.html` を Chrome か Edge で開くだけで動きます（インストール不要）。
 
 - **保存（Ctrl+S）は `.icad`**：このアプリの作業用の形式です（中身は JSON）。ガイドや、3D で使う ID もそのまま残ります
+- **STL 書き出し**：押し出した立体を 3D プリンター用の STL（単位 mm）にします。選んでいればそれだけ、選んでいなければ全部
 - **SVG 書き出し（Ctrl+Alt+E）**：Illustrator で開ける SVG にします。レイヤーは `<g data-name>` で書き出します
 - Illustrator で書き出した SVG も「開く」で読み込めます。SVG を開いたときは、Ctrl+S でその SVG に上書きします
 - SVG ファイルを画面にドロップすると、いまのレイヤーに配置します
@@ -17,6 +18,14 @@ Adobe Illustrator とは関係のない、非公式のツールです。
 - 作業中の内容はブラウザに自動で残ります（次に開いたときに復元）
 
 ## できること
+
+### 3D（段階1）
+- 画面は三面図：左が **平面図**（いつもの 2D の画面）、右上が **正面図**、右下が **側面図**（右から見た図）
+- 閉じたパスを選んで、パネルの「3D 押し出し」で **高さ** と **底**（床から浮かせる高さ）を入れると立体になる
+- 正面図・側面図は 表示 → 正面図・側面図 でしまえる
+- 押し出しは、コピー・複製・保存（.icad と SVG）でそのまま付いてくる（イラレで開いて保存すると消えます）
+
+### 2D
 
 - ペン、ダイレクト選択、アンカーの追加・削除・切り替え
   - ペン：ドラッグ中に Alt で切り返し（鋭角）、Space でアンカーを移動、Alt でアンカーポイントツールに一時切り替え
@@ -38,7 +47,7 @@ Adobe Illustrator とは関係のない、非公式のツールです。
 
 - 文字、画像、グラデーション（読み込むときは飛ばします）
 - シェイプ形成ツール、ライブコーナー、パスの単純化
-- 3D（次の段階）
+- 3D の続き：正面図・側面図でドラッグして押し出す、回して見る 3D 表示、正面図・側面図でのペン、3D バケツ、回転体
 - Ctrl+N・Ctrl+W・Ctrl+T（ブラウザが使っているキーなので取れません）
 
 ## プログラムの構成
@@ -60,11 +69,13 @@ Adobe Illustrator とは関係のない、非公式のツールです。
 | | `edit.js` | 編集の操作（変形、グループ、パスファインダー、色、貼り付けなど） |
 | | `pathfinder.js` | paper.js を使ったパスファインダーの計算 |
 | | `offset.js` | パスのオフセット（Clipper で計算して、ベジェに戻す） |
+| | `solids.js` | 3D の押し出し（輪郭づくり、三角形に分ける） |
 | `js/render/` | `view.js` | 画面への描画（作品・選択の表示・定規・グリッド） |
 | | `hittest.js` | 当たり判定 |
+| | `views3d.js` | 正面図・側面図 |
 | `js/tools/` | `drag.js` / `transform.js` / `shapes.js` / `tools.js` | 各ツールの動き |
 | `js/ui/` | `mouse.js` / `keyboard.js` / `panels.js` / `dialogs.js` / `help.js` | マウス、キーボード、パネル、ダイアログ、一覧 |
-| `js/io/` | `svgio.js` / `files.js` / `clipboard.js` | SVG、ファイル、クリップボード |
+| `js/io/` | `svgio.js` / `files.js` / `clipboard.js` / `stl.js` | SVG、ファイル、クリップボード、STL |
 | `js/vendor/` | `paper-core.min.js` | [paper.js](http://paperjs.org/) 0.12.18（MIT ライセンス） |
 | | `clipper.js` | [clipper-lib](https://www.npmjs.com/package/clipper-lib) 6.4.2（Boost Software License） |
 | `js/` | `app.js` | 起動 |
@@ -78,10 +89,12 @@ doc = {
   layers: [{ id, name, color, visible, locked, items: [パス or グループ] }],
   solids: []   // 3D の形を置く場所（断面はパスの ID で参照。レイヤーとは別に持つ）
 }
-パス     = { id, subs: [{ nodes: [{ x, y, hin, hout, smooth }], closed }], fill, stroke, sw, rule, hidden, locked }
+パス     = { id, subs: [{ nodes: [{ x, y, hin, hout, smooth }], closed }], fill, stroke, sw, rule, hidden, locked, x3d? }
+           x3d = { z0: 底の高さ, h: 高さ }（押し出したパスだけ）
 グループ = { id, type: 'group', name, children: [...], hidden, locked }
 ```
 
-- 座標の単位は pt（イラレの SVG と同じ）。3D の書き出しのときに mm へ換算します
+- 座標の単位は pt（イラレの SVG と同じ）。STL の書き出しのときに mm へ換算します
+- 3D の向き：平面図の x が右、平面図の下（y が大きい方）が手前、z が上
 - ハンドル `hin` / `hout` は絶対座標。`null` はハンドルなし
 - ID は保存・読み込み（`.icad` でも SVG の `data-icad-id` でも）で変わりません

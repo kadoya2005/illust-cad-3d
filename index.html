@@ -4,17 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>イラレCAD</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <header id="topbar">
-  <div class="brand">イラレCAD <span class="ver">2D 試作</span></div>
+  <div class="brand">イラレCAD <span class="ver">3D 試作</span></div>
   <div class="menu">
     <button data-cmd="new">新規</button>
     <button data-cmd="open" title="Ctrl+O">開く</button>
     <button data-cmd="save" title="Ctrl+S">保存</button>
     <button data-cmd="saveAs" title="Ctrl+Shift+S">別名で保存</button>
     <button data-cmd="exportSvg" title="Ctrl+Alt+E　イラレで開ける SVG にする">SVG書き出し</button>
+    <button data-cmd="exportStl" title="3D プリンター用（単位 mm）。選んだ立体だけ、選んでいなければ全部">STL書き出し</button>
     <span class="sep"></span>
     <div class="mwrap"><button data-menu="object">オブジェクト ▾</button><div class="dropdown" id="menu-object" hidden></div></div>
     <div class="mwrap"><button data-menu="view">表示 ▾</button><div class="dropdown" id="menu-view" hidden></div></div>
@@ -76,6 +77,11 @@
   <canvas id="rulerLeft" class="ruler"></canvas>
   <div id="rulerCorner" class="ruler"></div>
 </main>
+
+<aside id="views" title="正面図・側面図（平面図で押し出したパスが、ここに立体で出ます）">
+  <svg id="viewFront" class="view3d" xmlns="http://www.w3.org/2000/svg"></svg>
+  <svg id="viewSide" class="view3d" xmlns="http://www.w3.org/2000/svg"></svg>
+</aside>
 
 <aside id="panels">
   <section>
@@ -143,6 +149,17 @@
     </div>
   </section>
   <section>
+    <h2>3D 押し出し <span class="note">pt</span></h2>
+    <div class="grid2 ex3d">
+      <label title="押し出す高さ">高さ</label><input type="number" id="inExH" step="any" min="0">
+      <label title="底の高さ（床からどれだけ浮かせるか）">底</label><input type="number" id="inExZ" step="any">
+    </div>
+    <div class="row ex3dBtns">
+      <button id="btnExtrude" title="選んだ閉じたパスを押し出す">押し出す</button>
+      <button id="btnUnextrude" title="押し出しをやめて、平らなパスに戻す">解除</button>
+    </div>
+  </section>
+  <section>
     <h2>アートボード <span class="note">pt</span></h2>
     <div class="grid2">
       <label>幅</label><input type="number" id="inBW" step="any" min="1">
@@ -200,33 +217,36 @@
   ui     … マウス・キーボード・パネル・ダイアログ
   io     … ファイルとクリップボード
 -->
-<script src="js/vendor/paper-core.min.js?v=5"></script>
-<script src="js/vendor/clipper.js?v=5"></script>
-<script src="js/core/geom.js?v=5"></script>
-<script src="js/core/config.js?v=5"></script>
-<script src="js/core/state.js?v=5"></script>
-<script src="js/core/document.js?v=5"></script>
-<script src="js/core/selection.js?v=5"></script>
-<script src="js/core/history.js?v=5"></script>
-<script src="js/core/prefs.js?v=5"></script>
-<script src="js/core/snap.js?v=5"></script>
-<script src="js/core/pathfinder.js?v=5"></script>
-<script src="js/core/offset.js?v=5"></script>
-<script src="js/io/svgio.js?v=5"></script>
-<script src="js/render/view.js?v=5"></script>
-<script src="js/render/hittest.js?v=5"></script>
-<script src="js/core/edit.js?v=5"></script>
-<script src="js/tools/drag.js?v=5"></script>
-<script src="js/tools/transform.js?v=5"></script>
-<script src="js/tools/shapes.js?v=5"></script>
-<script src="js/tools/tools.js?v=5"></script>
-<script src="js/ui/dialogs.js?v=5"></script>
-<script src="js/ui/mouse.js?v=5"></script>
-<script src="js/ui/keyboard.js?v=5"></script>
-<script src="js/io/clipboard.js?v=5"></script>
-<script src="js/io/files.js?v=5"></script>
-<script src="js/ui/panels.js?v=5"></script>
-<script src="js/ui/help.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/vendor/paper-core.min.js?v=7"></script>
+<script src="js/vendor/clipper.js?v=7"></script>
+<script src="js/core/geom.js?v=7"></script>
+<script src="js/core/config.js?v=7"></script>
+<script src="js/core/state.js?v=7"></script>
+<script src="js/core/document.js?v=7"></script>
+<script src="js/core/selection.js?v=7"></script>
+<script src="js/core/history.js?v=7"></script>
+<script src="js/core/prefs.js?v=7"></script>
+<script src="js/core/snap.js?v=7"></script>
+<script src="js/core/pathfinder.js?v=7"></script>
+<script src="js/core/offset.js?v=7"></script>
+<script src="js/core/solids.js?v=7"></script>
+<script src="js/io/svgio.js?v=7"></script>
+<script src="js/render/view.js?v=7"></script>
+<script src="js/render/hittest.js?v=7"></script>
+<script src="js/render/views3d.js?v=7"></script>
+<script src="js/core/edit.js?v=7"></script>
+<script src="js/tools/drag.js?v=7"></script>
+<script src="js/tools/transform.js?v=7"></script>
+<script src="js/tools/shapes.js?v=7"></script>
+<script src="js/tools/tools.js?v=7"></script>
+<script src="js/ui/dialogs.js?v=7"></script>
+<script src="js/ui/mouse.js?v=7"></script>
+<script src="js/ui/keyboard.js?v=7"></script>
+<script src="js/io/clipboard.js?v=7"></script>
+<script src="js/io/files.js?v=7"></script>
+<script src="js/io/stl.js?v=7"></script>
+<script src="js/ui/panels.js?v=7"></script>
+<script src="js/ui/help.js?v=7"></script>
+<script src="js/app.js?v=7"></script>
 </body>
 </html>

@@ -162,6 +162,7 @@ function shapeToItem(el, ctx) {
     rule: cs.fillRule === 'evenodd' ? 'evenodd' : 'nonzero',
     hidden: cs.display === 'none',
     locked: el.getAttribute('data-locked') === 'true',
+    ...parseX3d(el.getAttribute('data-icad-x3d')),
   };
 }
 
@@ -245,9 +246,14 @@ function parseSVG(text) {
 // ---- 書き出し ----
 const svgEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// 押し出し（3D）は data-icad-x3d="底,高さ" で残す（イラレで開いて保存すると消えます）
+function parseX3d(v) {
+  const a = (v || '').split(',').map(Number);
+  return a.length === 2 && a.every(isFinite) && a[1] > 0 ? { x3d: { z0: a[0], h: a[1] } } : {};
+}
 function nodeToSVG(n, ind) {
   // data-icad-id：読み込み直しても ID が変わらないように（3D の断面が ID で参照するため）
-  const extra = ` data-icad-id="${svgEsc(n.id)}"` + (n.locked ? ' data-locked="true"' : '') + (n.hidden ? ' style="display:none"' : '');
+  const extra = ` data-icad-id="${svgEsc(n.id)}"` + (n.x3d ? ` data-icad-x3d="${fmt(n.x3d.z0)},${fmt(n.x3d.h)}"` : '') + (n.locked ? ' data-locked="true"' : '') + (n.hidden ? ' style="display:none"' : '');
   if (n.type === 'group') {
     const name = n.name ? ` data-name="${svgEsc(n.name)}"` : '';
     return `${ind}<g${name}${extra}>\n` + n.children.map((c) => nodeToSVG(c, ind + '  ')).join('') + `${ind}</g>\n`;

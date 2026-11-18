@@ -19,8 +19,10 @@ function init() {
   if (saved) { doc = saved.doc; if (saved.name) S.fileName = saved.name; }
   normalizeDoc(); ensureActiveLayer(); resetHistory();
   buildHelp();
+  document.body.classList.toggle('no3d', !S.show3d);
   fitView(); render(); updateUI(); updateCursor();
-  window.addEventListener('resize', () => renderView());
+  document.body.classList.toggle('no3d', !S.show3d);
+  window.addEventListener('resize', () => { renderView(); renderViews(); });
   // キーボードの配列（日本語か英語か）を調べる。分からなければ日本語として扱う
   try {
     if (navigator.keyboard && navigator.keyboard.getLayoutMap) {

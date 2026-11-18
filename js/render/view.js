@@ -24,6 +24,7 @@ function fitView() {
   const m = 40 + (S.rulers ? RULER : 0);
   const z = Math.max(0.03125, Math.min((r.width - 2 * m) / doc.width, (r.height - 2 * m) / doc.height));
   view.z = z; view.x = (r.width - doc.width * z) / 2; view.y = (r.height - doc.height * z) / 2;
+  if (typeof fitViews3d === 'function') fitViews3d();   // 正面図・側面図も元の大きさに
   renderView();
 }
 
@@ -42,6 +43,7 @@ function renderArt() {
   for (const L of doc.layers) if (L.visible) h += '<g>' + renderNodes(L.items) + '</g>';
   art.innerHTML = h;
   S.snapCache = null;
+  renderViews();   // 正面図・側面図も描き直す
 }
 function renderGrid() {
   if (!S.grid) { gridG.innerHTML = ''; return; }

@@ -280,6 +280,8 @@ function toggleActiveColor() { S.activeColor = S.activeColor === 'fill' ? 'strok
 // ---- 表示の切り替え ----
 function togglePref(k) { S[k] = !S[k]; savePrefs(); renderView(); updateUI(); }
 const toggleRulers = () => togglePref('rulers');
+// 正面図・側面図を出す／しまう
+function toggle3dViews() { S.show3d = !S.show3d; savePrefs(); document.body.classList.toggle('no3d', !S.show3d); renderView(); renderViews(); updateUI(); }
 const toggleGrid = () => togglePref('grid');
 const toggleSnapGrid = () => togglePref('snapGrid');
 const toggleSmart = () => togglePref('smart');

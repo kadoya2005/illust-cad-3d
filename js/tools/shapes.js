@@ -132,4 +132,5 @@ function updateCursor() {
   else if (t === 'zoom') c = S.keys.alt ? 'zoom-out' : 'zoom-in';
   else if (!SEL_TOOLS.has(t)) c = 'crosshair';
   stage.style.cursor = c;
+  if (typeof updateViewsCursor === 'function') updateViewsCursor();
 }
