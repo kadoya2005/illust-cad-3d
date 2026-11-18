@@ -147,6 +147,22 @@ function crossesHole(a, b, h) {
 }
 const ringArea = (r) => { let s = 0; for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; s += a.x * b.y - b.x * a.y; } return s / 2; };
 
+// 上と下の面を三角形に分ける。three.js の earcut（くぼみ・穴に強い）を使い、なければ自前のやり方で
+function triangulateCap(outer, holes) {
+  if (window.THREE && THREE.ShapeUtils) {
+    const o = outer.map((p) => new THREE.Vector2(p.x, p.y));
+    const hs = holes.map((h) => h.map((p) => new THREE.Vector2(p.x, p.y)));
+    const faces = THREE.ShapeUtils.triangulateShape(o, hs);   // o・hs の最後の重なった点は取り除かれる
+    const pts = [...o, ...hs.flat()].map((v) => P(v.x, v.y));
+    // 三角形の向きを、上から見て反時計回りにそろえる（裏返った面を作らない）
+    const tris = faces.map(([a, b, c]) => {
+      const ar = (pts[b].x - pts[a].x) * (pts[c].y - pts[a].y) - (pts[b].y - pts[a].y) * (pts[c].x - pts[a].x);
+      return ar < 0 ? [a, c, b] : [a, b, c];
+    });
+    return { pts, tris };
+  }
+  return triangulate(outer, holes);
+}
 // 押し出したパス1つ → 三角形の一覧 [[x,y,z]×3]（3D の向き：X 右、Y 奥、Z 上。単位 pt）
 function solidTriangles(it) {
   const ex = extrudeOf(it);
@@ -158,7 +174,7 @@ function solidTriangles(it) {
     const up = (r) => r.map((p) => P(p.x, -p.y));
     let outer = up(sh.outer); if (ringArea(outer) < 0) outer.reverse();
     const holes = sh.holes.map(up).map((h) => (ringArea(h) > 0 ? h.reverse() : h));
-    const { pts, tris } = triangulate(outer, holes);
+    const { pts, tris } = triangulateCap(outer, holes);
     const P3 = (i, z) => [pts[i].x, pts[i].y, z];
     for (const [a, b, c] of tris) {
       out.push([P3(a, z1), P3(b, z1), P3(c, z1)]);   // 上の面（上向き）

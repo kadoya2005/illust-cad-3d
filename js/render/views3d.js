@@ -424,13 +424,20 @@ for (const v of VIEWS) {
     closeMenus();
     const q = local(e);
     const grab = () => { try { el.setPointerCapture(e.pointerId); } catch (_) { /* つかめなくても動かす */ } };
+    // 虫眼鏡：Ctrl+Space（Alt も押すと縮小）、またはズームツール（Z）。クリックした所を中心に
+    const zoomTool = e.button === 0 && ((S.spaceDown && (e.ctrlKey || e.metaKey)) || (!S.spaceDown && S.tool === 'zoom'));
+    if (zoomTool) {
+      e.preventDefault();
+      zoomView3d(v.id, q.x, q.y, V3.k * (e.altKey ? 0.5 : 2));
+      return;
+    }
     if (e.button === 0 && S.spaceDown && e.shiftKey) {
       e.preventDefault(); grab();
       drag = { type: 'orbit', s: q, o: { ...V3.rot[v.id] } };
       updateCursor();
       return;
     }
-    if (e.button === 1 || (e.button === 0 && S.spaceDown)) {
+    if (e.button === 1 || (e.button === 0 && (S.spaceDown || S.tool === 'hand'))) {
       e.preventDefault(); grab();
       drag = { type: 'pan', s: q, o: P(V3.pan[v.id].x, V3.pan[v.id].y) };
       updateCursor();
@@ -501,12 +508,16 @@ const HANDLE_CURSORS = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-
 function updateViewsCursor() {
   for (const v of VIEWS) {
     const el = $(v.id), hv = el.dataset.hover;
-    el.style.cursor = S.spaceDown ? (S.keys.shift ? ROTATE_CURSORS.ne : 'grab') : HANDLE_CURSORS[hv] || SELECT_CURSOR;
+    const zoom = (S.spaceDown && S.keys.ctrl) || (!S.spaceDown && S.tool === 'zoom');
+    el.style.cursor = zoom ? (S.keys.alt ? 'zoom-out' : 'zoom-in')
+      : S.spaceDown ? (S.keys.shift ? ROTATE_CURSORS.ne : 'grab')
+      : S.tool === 'hand' ? 'grab'
+      : HANDLE_CURSORS[hv] || SELECT_CURSOR;
   }
 }
 function hoverView(id, q) {
   if (!V3.ok) return;
-  $(id).dataset.hover = S.spaceDown ? '' : hitViewHandle(id, q) || '';
+  $(id).dataset.hover = S.spaceDown || S.tool === 'zoom' || S.tool === 'hand' ? '' : hitViewHandle(id, q) || '';
   updateViewsCursor();
 }
 // ドラッグ中の数値
