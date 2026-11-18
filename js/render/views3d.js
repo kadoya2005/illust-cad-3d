@@ -187,6 +187,7 @@ function renderViews() {
     V3.light.target.position.copy(center).add(off);
     V3.light.target.updateMatrixWorld();
     vw.renderer.render(scene, cam);
+    drawViewBox(v.id);   // 選んでいるものの枠
     vw.label.textContent = v.name + (isRotated(v.id) ? '（回転中・ダブルクリックで戻る）' : '');
     vw.hint.textContent = !solids.length && v.id === 'viewFront' ? 'パスを選んで、パネルの「3D 押し出し」で高さを入れると、ここに立体が出ます' : '';
   }
@@ -218,11 +219,202 @@ function zoomView3d(id, x, y, nk) {
   renderViews();
 }
 
+// ---- 正面図・側面図での選択と変形（イラレの選択ツールと同じ考え方） ----
+// 選んだものには、どの図にもバウンディングボックスが出る
+//   枠の中をドラッグ：その図の平面で移動（正面図＝左右 x と高さ、側面図＝左右 奥行きと高さ）。Shift で真横・真上に
+//   取っ手をドラッグ：伸び縮み（横＝幅・奥行き、縦＝高さ）。Alt で中心から、Shift で縦横比をそのまま（角の取っ手）
+//   平らなパスの上の取っ手を引き上げると、押し出しになる
+// 回して見ている図では、選ぶだけ
+const SNAP_PX = 6;      // ほかの立体の高さに吸着する距離
+const editable = (id) => !isRotated(id);
+// 画面の右へ 1px 動いたときの、平面図での動き（正面図＝x の +、側面図＝y の −。手前が左）
+const hAxis = (id) => (id === 'viewFront' ? 'x' : 'y');
+const hSign = (id) => (id === 'viewFront' ? 1 : -1);
+
+// 押し出していないパス（床の上の線）をクリックで拾う
+function hitFlat(id, q) {
+  const vw = V3.views[id], r = vw.box.getBoundingClientRect();
+  let best = null, bd = 5;
+  for (const it of visibleLeaves()) {
+    if (extrudeOf(it)) continue;
+    for (const sb of it.subs) {
+      if (sb.nodes.length < 2) continue;
+      const pts = polyFromSub(sb).map((p) => {
+        const pr = new THREE.Vector3(p.x, 0, p.y).project(vw.camera);
+        return P(((pr.x + 1) / 2) * r.width, ((1 - pr.y) / 2) * r.height);
+      });
+      if (sb.closed) pts.push(pts[0]);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1], ab = vsub(b, a), L2 = ab.x * ab.x + ab.y * ab.y;
+        const t = L2 > 1e-9 ? Math.max(0, Math.min(1, ((q.x - a.x) * ab.x + (q.y - a.y) * ab.y) / L2)) : 0;
+        const d = vdist(q, vadd(a, vmul(ab, t)));
+        if (d < bd) { bd = d; best = it.id; }
+      }
+    }
+  }
+  return best;
+}
+// 選んでいるものの範囲（平面図の bbox と高さ）
+function selRange() {
+  const items = selectedItems();
+  if (!items.length) return null;
+  const bb = Geo.bbox(items);
+  if (!bb) return null;
+  let zMin = Infinity, zMax = -Infinity;
+  for (const it of items) { const x = extrudeOf(it); const a = x ? x.z0 : 0, b = x ? x.z0 + x.h : 0; zMin = Math.min(zMin, a); zMax = Math.max(zMax, b); }
+  return { items, bb, zMin, zMax };
+}
+// その図の画面での、選んでいるものの枠（px）
+function viewBox(id) {
+  if (!editable(id)) return null;
+  const sr = selRange();
+  if (!sr) return null;
+  const vw = V3.views[id], r = vw.box.getBoundingClientRect();
+  const { bb, zMin, zMax } = sr;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const x of [bb.x, bb.x + bb.w]) for (const y of [bb.y, bb.y + bb.h]) for (const z of [zMin, zMax]) {
+    const pr = new THREE.Vector3(x, z, y).project(vw.camera);
+    const sx = ((pr.x + 1) / 2) * r.width, sy = ((1 - pr.y) / 2) * r.height;
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+  }
+  return { x0, x1, y0, y1, ...sr };
+}
+const VB_HANDLES = (b) => {
+  const mx = (b.x0 + b.x1) / 2, my = (b.y0 + b.y1) / 2;
+  // 平らなもの（高さ 0）は上の取っ手だけ（引き上げると押し出し）
+  const flat = b.y1 - b.y0 < 1;
+  const hs = { n: [mx, b.y0], e: [b.x1, my], w: [b.x0, my] };
+  if (!flat) Object.assign(hs, { nw: [b.x0, b.y0], ne: [b.x1, b.y0], sw: [b.x0, b.y1], se: [b.x1, b.y1], s: [mx, b.y1] });
+  return hs;
+};
+// 枠と取っ手を描く（canvas の上の SVG）
+function drawViewBox(id) {
+  const svg = V3.views[id].box.querySelector('.vover');
+  const b = viewBox(id);
+  if (!b || S.hideEdges) { svg.innerHTML = ''; return; }
+  const col = findItem(b.items[0].id).layer.color;
+  let h = `<rect x="${b.x0}" y="${b.y0}" width="${Math.max(0, b.x1 - b.x0)}" height="${Math.max(0, b.y1 - b.y0)}" fill="none" stroke="${col}" stroke-width="1"/>`;
+  for (const [x, y] of Object.values(VB_HANDLES(b))) h += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="#fff" stroke="${col}" stroke-width="1"/>`;
+  svg.innerHTML = h;
+}
+function hitViewHandle(id, q) {
+  const b = viewBox(id);
+  if (!b) return null;
+  let best = null, bd = 6;
+  for (const [k, [x, y]] of Object.entries(VB_HANDLES(b))) { const d = Math.hypot(x - q.x, y - q.y); if (d < bd) { bd = d; best = k; } }
+  return best;
+}
+const insideViewBox = (id, q) => { const b = viewBox(id); return !!b && q.x >= b.x0 - 3 && q.x <= b.x1 + 3 && q.y >= b.y0 - 3 && q.y <= b.y1 + 3; };
+
+// 吸着する高さ：ほかの立体の上と下、床（0）
+function snapHeights(exclude) {
+  const hs = [0];
+  for (const it of visibleSolids()) if (!exclude.has(it.id)) hs.push(it.x3d.z0, it.x3d.z0 + it.x3d.h);
+  return hs;
+}
+function snapZ(d, edges, dz, e) {
+  d.snapZ = null;
+  if (e.ctrlKey) return dz;   // Ctrl で吸着しない
+  let best = null, bd = SNAP_PX / V3.scale;
+  for (const base of edges) for (const z of d.snaps) { const diff = z - (base + dz); if (Math.abs(diff) < bd) { bd = Math.abs(diff); best = { diff, z }; } }
+  if (best) { d.snapZ = best.z; return dz + best.diff; }
+  return dz;
+}
+function startViewXf(id, kind, handle, q) {
+  const sr = selRange();
+  if (!sr) return null;
+  return {
+    type: 'vxf', kind, handle, view: id, s: q, sr, moved: false,
+    subs: snapshotSel(),
+    x3d: new Map(sr.items.map((it) => [it.id, it.x3d ? { ...it.x3d } : null])),
+    snaps: snapHeights(new Set(sr.items.map((it) => it.id))),
+  };
+}
+function moveViewXf(d, q, e) {
+  let dx = q.x - d.s.x, dy = q.y - d.s.y;
+  if (!d.moved && Math.hypot(dx, dy) < 3) return;
+  d.moved = true;
+  const sc = V3.scale, ax = hAxis(d.view), sg = hSign(d.view);
+  const { bb, zMin, zMax, items } = d.sr;
+  restoreFrom(d.subs);
+  for (const it of items) { const o = d.x3d.get(it.id); if (o) it.x3d = { ...o }; else delete it.x3d; }
+  let tip = '';
+  if (d.kind === 'move') {
+    if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+    const du = (dx / sc) * sg;                 // 平面図での動き（その図の横の向き）
+    let dz = -dy / sc;
+    const solids = items.filter((it) => d.x3d.get(it.id));
+    if (solids.length && dz) dz = snapZ(d, [zMin, zMax], dz, e);
+    else dz = solids.length ? dz : 0;
+    const f = ax === 'x' ? (p) => P(p.x + du, p.y) : (p) => P(p.x, p.y + du);
+    items.forEach((it) => mapItem(it, f));
+    for (const it of solids) it.x3d.z0 += dz;
+    tip = `${ax === 'x' ? '横' : '奥行き'} ${r2(du)} pt　高さ ${r2(dz)} pt`;
+  } else {
+    const h = d.handle;
+    const hasE = h.includes('e'), hasW = h.includes('w'), hasN = h.includes('n'), hasS = h.includes('s');
+    // 横：画面の左右の端を、平面図の座標にする
+    const lo = ax === 'x' ? bb.x : bb.y, hi = ax === 'x' ? bb.x + bb.w : bb.y + bb.h, span = hi - lo;
+    // 画面の右の端が平面図のどちらか（側面図は手前＝ y の大きい方が左）
+    const rightV = sg > 0 ? hi : lo, leftV = sg > 0 ? lo : hi;
+    let kx = 1, aU = null;
+    if ((hasE || hasW) && span > 1e-9) {
+      const move = (dx / sc) * sg;   // 動かす端の、平面図での動き
+      if (hasE) { aU = e.altKey ? (lo + hi) / 2 : leftV; const edge = rightV + move; kx = (edge - aU) / (rightV - aU); }
+      else { aU = e.altKey ? (lo + hi) / 2 : rightV; const edge = leftV + move; kx = (edge - aU) / (leftV - aU); }
+    }
+    // 縦：高さ
+    let kz = 1, aZ = null, create = false, dzc = 0;
+    const zs = zMax - zMin;
+    if (hasN || hasS) {
+      let dz = -dy / sc;
+      if (zs < 1e-6) {
+        // 平らなもの：上の取っ手を引き上げると押し出し
+        if (hasN) { dz = snapZ(d, [zMax], dz, e); create = true; dzc = Math.max(0.1, dz); }
+      } else if (hasN) {
+        aZ = e.altKey ? (zMin + zMax) / 2 : zMin;
+        dz = snapZ(d, [zMax], dz, e);
+        kz = (zMax + dz - aZ) / (zMax - aZ);
+      } else {
+        aZ = e.altKey ? (zMin + zMax) / 2 : zMax;
+        dz = snapZ(d, [zMin], dz, e);
+        kz = (zMin + dz - aZ) / (zMin - aZ);
+      }
+    }
+    // Shift：角の取っ手は縦横の比をそのまま
+    if (e.shiftKey && aU != null && aZ != null) { const k = Math.max(Math.abs(kx), Math.abs(kz)); kx = k; kz = k; }
+    kx = Math.max(0.01, kx); kz = Math.max(0.001, kz);
+    if (aU != null) {
+      const f = ax === 'x' ? (p) => P(aU + (p.x - aU) * kx, p.y) : (p) => P(p.x, aU + (p.y - aU) * kx);
+      items.forEach((it) => mapItem(it, f));
+    }
+    if (aZ != null) {
+      for (const it of items) {
+        if (!it.x3d) continue;
+        const z0 = aZ + (it.x3d.z0 - aZ) * kz, z1 = aZ + (it.x3d.z0 + it.x3d.h - aZ) * kz;
+        it.x3d = { z0: Math.min(z0, z1), h: Math.max(0.1, Math.abs(z1 - z0)) };
+      }
+    }
+    if (create) for (const it of items) if (it.subs.some((sb) => sb.closed && sb.nodes.length >= 2)) it.x3d = { z0: zMin, h: dzc };
+    const nr = selRange();
+    const w = ax === 'x' ? nr.bb.w : nr.bb.h;
+    tip = `${ax === 'x' ? '幅' : '奥行き'} ${r2(w)} pt　高さ ${r2(nr.zMax - nr.zMin)} pt`;
+  }
+  d.tip = tip + (d.snapZ != null ? '　（吸着）' : '');
+  render(); updateUI();
+}
+function endViewXf(d) {
+  if (!d.moved) return;
+  const x = selectedItems().find((it) => it.x3d);
+  if (x) S.lastExH = x.x3d.h;
+  render(); commit();
+}
+
 // ---- 正面図・側面図のマウス ----
 // Space＋ドラッグ（中ボタンでも）：手のひら
 // Shift＋Space＋ドラッグ：3D 手のひら（回す）。ドラッグ中に Shift を押していると 15° ずつ
 // ダブルクリック：回したのを元に戻す／Alt＋ホイール：拡大・縮小／ホイール：上下（Ctrl・Shift で左右）
-// クリック：立体を選ぶ（Shift で追加・外す）。何もないところをクリックで選択解除
+// クリック：立体・線を選ぶ（Shift で追加・外す）。何もないところをクリックで選択解除
 for (const v of VIEWS) {
   const el = $(v.id);
   const local = (e) => { const r = el.getBoundingClientRect(); return P(e.clientX - r.left, e.clientY - r.top); };
@@ -246,18 +438,31 @@ for (const v of VIEWS) {
     }
     if (e.button !== 0) return;
     if (S.drawing) endDrawing();
-    const id = hitView(v.id, q.x, q.y);
+    // 取っ手：伸び縮み
+    const hd = !e.shiftKey && hitViewHandle(v.id, q);
+    if (hd) { grab(); drag = startViewXf(v.id, 'scale', hd, q); return; }
+    // 立体・線をクリック
+    const id = hitView(v.id, q.x, q.y) || hitFlat(v.id, q);
     const f = id && findItem(id);
     if (f) {
       const target = topOf(f.item);
-      if (e.shiftKey && S.sel.has(id)) leaves([target]).forEach((it) => S.sel.delete(it.id));
-      else selectNode(target, e.shiftKey);
-    } else if (!e.shiftKey) S.sel.clear();
+      const ls = leaves([target]);
+      const wasSel = ls.every((it) => S.sel.has(it.id) && isFullySel(it));
+      if (e.shiftKey && wasSel) { ls.forEach((it) => S.sel.delete(it.id)); afterSelect(); render(); updateUI(); return; }
+      if (e.shiftKey || !wasSel) selectNode(target, e.shiftKey);
+      afterSelect(); render(); updateUI();
+      if (editable(v.id)) { grab(); drag = startViewXf(v.id, 'move', null, q); }
+      return;
+    }
+    // 枠の中（何もないところでも）：移動
+    if (!e.shiftKey && insideViewBox(v.id, q)) { grab(); drag = startViewXf(v.id, 'move', null, q); return; }
+    if (!e.shiftKey) S.sel.clear();
     afterSelect(); render(); updateUI();
   });
   el.addEventListener('pointermove', (e) => {
-    if (!drag) return;
     const q = local(e);
+    if (!drag) { hoverView(v.id, q); return; }
+    if (drag.type === 'vxf') { moveViewXf(drag, q, e); showTip(v.id, q, drag.moved ? drag.tip : ''); return; }
     if (drag.type === 'pan') V3.pan[v.id] = P(drag.o.x + q.x - drag.s.x, drag.o.y + q.y - drag.s.y);
     else {
       // 横に動かすと横に回る、縦に動かすと見下ろす・見上げる（0.5° / px）
@@ -269,9 +474,14 @@ for (const v of VIEWS) {
     }
     renderViews();
   });
-  const end = () => { if (drag) { drag = null; updateCursor(); } };
+  const end = () => {
+    if (!drag) return;
+    if (drag.type === 'vxf') { endViewXf(drag); showTip(v.id, null, ''); }
+    drag = null; updateCursor();
+  };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
+  el.addEventListener('pointerleave', () => { if (!drag) el.dataset.hover = ''; updateViewsCursor(); });
   el.addEventListener('dblclick', () => { if (isRotated(v.id)) { V3.rot[v.id] = { yaw: v.yaw, pitch: 0 }; renderViews(); } });
   el.addEventListener('contextmenu', (e) => e.preventDefault());
   el.addEventListener('wheel', (e) => {
@@ -286,8 +496,25 @@ for (const v of VIEWS) {
     }
   }, { passive: false });
 }
-// カーソル：Space で手のひら、Shift＋Space で回す
+// カーソル：Space で手のひら、Shift＋Space で回す、取っ手の上で伸び縮みの矢印、ふだんは黒い矢印
+const HANDLE_CURSORS = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' };
 function updateViewsCursor() {
-  const c = S.spaceDown ? (S.keys.shift ? ROTATE_CURSORS.ne : 'grab') : 'default';
-  for (const v of VIEWS) $(v.id).style.cursor = c;
+  for (const v of VIEWS) {
+    const el = $(v.id), hv = el.dataset.hover;
+    el.style.cursor = S.spaceDown ? (S.keys.shift ? ROTATE_CURSORS.ne : 'grab') : HANDLE_CURSORS[hv] || SELECT_CURSOR;
+  }
+}
+function hoverView(id, q) {
+  if (!V3.ok) return;
+  $(id).dataset.hover = S.spaceDown ? '' : hitViewHandle(id, q) || '';
+  updateViewsCursor();
+}
+// ドラッグ中の数値
+function showTip(id, q, text) {
+  const tip = V3.views[id] && V3.views[id].box.querySelector('.vtip');
+  if (!tip) return;
+  tip.hidden = !text || !q;
+  if (tip.hidden) return;
+  tip.textContent = text;
+  tip.style.left = q.x + 14 + 'px'; tip.style.top = q.y + 10 + 'px';
 }

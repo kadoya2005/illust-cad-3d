@@ -186,6 +186,8 @@ function docRectPts(bb, pad) {
   return c.map((q) => `${q.x},${q.y}`).join(' ');
 }
 function drawOverlay() {
+  // 選択が変わったら、正面図・側面図の枠と色も描き直す
+  if (typeof V3 !== 'undefined' && V3.ok) { const sig = [...S.sel.keys()].join(); if (sig !== V3.lastSel) { V3.lastSel = sig; renderViews(); } }
   const t = displayTool();
   const nodeTool = NODE_TOOLS.has(t);
   const sp = toScr;
