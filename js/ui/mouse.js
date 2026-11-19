@@ -37,7 +37,7 @@ stage.addEventListener('pointermove', (e) => {
     updateCursor();
   }
   if (S.rulers) drawRulers();
-  $('stPos').textContent = `X ${p.x.toFixed(1)}  Y ${p.y.toFixed(1)} pt`;
+  $('stPos').textContent = `X ${p.x.toFixed(2)}  Y ${p.y.toFixed(2)} mm`;
 });
 function finishPointer(e, cancel) {
   if (!S.drag) return;

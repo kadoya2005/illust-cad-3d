@@ -3,8 +3,9 @@
 
 // イラレCAD 2D 試作：画面・ツール・ショートカット
 
-const DOC_VERSION = 2;         // ドキュメント（.icad）の形の版
-const PT_PER_MM = 72 / 25.4;   // 1mm = 2.8346pt
+const DOC_VERSION = 3;         // ドキュメント（.icad）の形の版（3：単位を mm に）
+const PT_PER_MM = 72 / 25.4;   // 1mm = 2.8346pt。中の値は mm。Illustrator（SVG）とのやりとりだけ pt に換算する
+const MM_PER_PT = 25.4 / 72;   // 1pt = 0.3528mm
 const LAYER_COLORS = ['#4f80ff', '#ff4f4f', '#3fbf3f', '#3fbfff', '#ff4fff', '#ffbf3f', '#9f6fff', '#ff8f3f'];
 const SEL_TOOLS = new Set(['select', 'direct']);
 const NODE_TOOLS = new Set(['direct', 'pen', 'addAnchor', 'deleteAnchor', 'convert']);
@@ -28,12 +29,13 @@ const TOOLS_META = {
   zoom: { name: 'ズームツール', key: 'Z', hint: 'クリックで拡大／Alt+クリックで縮小' },
   rotView: { name: '回転ビュー', key: 'Shift+Space', hint: 'ドラッグで画面を回す（Shift で 15° ずつ）／Ctrl+Shift+1 で元に戻す' },
 };
+const ZOOM_UNIT = PT_PER_MM;   // 表示 100% のときの view.z（1mm ＝ 2.83px。Illustrator と同じ見た目の大きさ）
 const ZOOMS = [0.03125, 0.0625, 0.125, 0.1667, 0.25, 0.3333, 0.5, 0.6667, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
 const AUTOSAVE_DOC = 'illustcad.autosave.doc';
 const AUTOSAVE_NAME = 'illustcad.autosave.name';
 const PREFS_KEY = 'illustcad.prefs';
 const RULER = 20;              // 定規の太さ（px）
-const GRID_MAJOR = 72;         // グリッド：72pt ごとに太線
-const GRID_DIV = 8;            // その中を 8 分割
+const GRID_MAJOR = 10;         // グリッド：10mm ごとに太線
+const GRID_DIV = 10;           // その中を 10 分割（1mm）
 const GUIDE_COLOR = '#00c8ff';
 const SMART_COLOR = '#ff3fd0';

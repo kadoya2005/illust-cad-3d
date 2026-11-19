@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>イラレCAD</title>
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 <header id="topbar">
@@ -88,10 +88,10 @@
     <h2>塗りと線</h2>
     <div class="row"><label>塗り</label><input type="color" id="inFill"><button id="fillNone" class="small">なし</button></div>
     <div class="row"><label>線</label><input type="color" id="inStroke"><button id="strokeNone" class="small">なし</button></div>
-    <div class="row"><label>線幅</label><input type="number" id="inSw" min="0" step="0.25"><span class="unit">pt</span></div>
+    <div class="row"><label>線幅</label><input type="number" id="inSw" min="0" step="0.05"><span class="unit" id="swUnit">mm</span></div>
   </section>
   <section>
-    <h2>変形 <span class="note">左上基準・pt</span></h2>
+    <h2>変形 <span class="note">左上基準・mm</span></h2>
     <div class="grid2">
       <label>X</label><input type="number" id="inX" step="any">
       <label>Y</label><input type="number" id="inY" step="any">
@@ -129,7 +129,7 @@
     <div class="pfRow al">
       <button data-space="v" title="垂直方向等間隔に分布"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="5" fill="currentColor"/><rect x="5" y="17" width="14" height="5" fill="currentColor"/><path d="M12 8v8M9 10l3-2 3 2M9 14l3 2 3-2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
       <button data-space="h" title="水平方向等間隔に分布"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="5" height="14" fill="currentColor"/><rect x="17" y="5" width="5" height="14" fill="currentColor"/><path d="M8 12h8M10 9l-2 3 2 3M14 9l2 3-2 3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
-      <input type="number" id="inGap" value="0" step="any" title="間隔（キーオブジェクトに整列のとき使います）"><span class="unit">pt</span>
+      <input type="number" id="inGap" value="0" step="any" title="間隔（キーオブジェクトに整列のとき使います）"><span class="unit">mm</span>
     </div>
   </section>
   <section>
@@ -149,7 +149,7 @@
     </div>
   </section>
   <section>
-    <h2>3D 押し出し <span class="note">pt</span></h2>
+    <h2>3D 押し出し <span class="note">mm</span></h2>
     <div class="grid2 ex3d">
       <label title="押し出す高さ">高さ</label><input type="number" id="inExH" step="any" min="0">
       <label title="底の高さ（床からどれだけ浮かせるか）">底</label><input type="number" id="inExZ" step="any">
@@ -160,7 +160,7 @@
     </div>
   </section>
   <section>
-    <h2>アートボード <span class="note">pt</span></h2>
+    <h2>アートボード <span class="note">mm</span></h2>
     <div class="grid2">
       <label>幅</label><input type="number" id="inBW" step="any" min="1">
       <label>高さ</label><input type="number" id="inBH" step="any" min="1">
@@ -217,38 +217,38 @@
   ui     … マウス・キーボード・パネル・ダイアログ
   io     … ファイルとクリップボード
 -->
-<script src="js/vendor/paper-core.min.js?v=17"></script>
-<script src="js/vendor/clipper.js?v=17"></script>
-<script src="js/vendor/three.min.js?v=17"></script>
-<script src="js/core/geom.js?v=17"></script>
-<script src="js/core/config.js?v=17"></script>
-<script src="js/core/plane.js?v=17"></script>
-<script src="js/core/state.js?v=17"></script>
-<script src="js/core/document.js?v=17"></script>
-<script src="js/core/selection.js?v=17"></script>
-<script src="js/core/history.js?v=17"></script>
-<script src="js/core/prefs.js?v=17"></script>
-<script src="js/core/snap.js?v=17"></script>
-<script src="js/core/pathfinder.js?v=17"></script>
-<script src="js/core/offset.js?v=17"></script>
-<script src="js/core/solids.js?v=17"></script>
-<script src="js/io/svgio.js?v=17"></script>
-<script src="js/render/view.js?v=17"></script>
-<script src="js/render/hittest.js?v=17"></script>
-<script src="js/render/views3d.js?v=17"></script>
-<script src="js/core/edit.js?v=17"></script>
-<script src="js/tools/drag.js?v=17"></script>
-<script src="js/tools/transform.js?v=17"></script>
-<script src="js/tools/shapes.js?v=17"></script>
-<script src="js/tools/tools.js?v=17"></script>
-<script src="js/ui/dialogs.js?v=17"></script>
-<script src="js/ui/mouse.js?v=17"></script>
-<script src="js/ui/keyboard.js?v=17"></script>
-<script src="js/io/clipboard.js?v=17"></script>
-<script src="js/io/files.js?v=17"></script>
-<script src="js/io/stl.js?v=17"></script>
-<script src="js/ui/panels.js?v=17"></script>
-<script src="js/ui/help.js?v=17"></script>
-<script src="js/app.js?v=17"></script>
+<script src="js/vendor/paper-core.min.js?v=18"></script>
+<script src="js/vendor/clipper.js?v=18"></script>
+<script src="js/vendor/three.min.js?v=18"></script>
+<script src="js/core/geom.js?v=18"></script>
+<script src="js/core/config.js?v=18"></script>
+<script src="js/core/plane.js?v=18"></script>
+<script src="js/core/state.js?v=18"></script>
+<script src="js/core/document.js?v=18"></script>
+<script src="js/core/selection.js?v=18"></script>
+<script src="js/core/history.js?v=18"></script>
+<script src="js/core/prefs.js?v=18"></script>
+<script src="js/core/snap.js?v=18"></script>
+<script src="js/core/pathfinder.js?v=18"></script>
+<script src="js/core/offset.js?v=18"></script>
+<script src="js/core/solids.js?v=18"></script>
+<script src="js/io/svgio.js?v=18"></script>
+<script src="js/render/view.js?v=18"></script>
+<script src="js/render/hittest.js?v=18"></script>
+<script src="js/render/views3d.js?v=18"></script>
+<script src="js/core/edit.js?v=18"></script>
+<script src="js/tools/drag.js?v=18"></script>
+<script src="js/tools/transform.js?v=18"></script>
+<script src="js/tools/shapes.js?v=18"></script>
+<script src="js/tools/tools.js?v=18"></script>
+<script src="js/ui/dialogs.js?v=18"></script>
+<script src="js/ui/mouse.js?v=18"></script>
+<script src="js/ui/keyboard.js?v=18"></script>
+<script src="js/io/clipboard.js?v=18"></script>
+<script src="js/io/files.js?v=18"></script>
+<script src="js/io/stl.js?v=18"></script>
+<script src="js/ui/panels.js?v=18"></script>
+<script src="js/ui/help.js?v=18"></script>
+<script src="js/app.js?v=18"></script>
 </body>
 </html>

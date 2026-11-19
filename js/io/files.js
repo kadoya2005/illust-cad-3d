@@ -27,7 +27,7 @@ function loadDocFromSVG(text, name, handle) {
   let r;
   try { r = parseSVG(text); } catch (err) { toast('SVG を読み込めませんでした：' + err.message); return; }
   setDocument({
-    width: r.width, height: r.height, guides: [], solids: [],
+    units: 'pt', width: r.width, height: r.height, guides: [], solids: [],   // SVG は pt（normalizeDoc で mm に）
     layers: r.layers.map((L, i) => ({ id: uid(), name: L.name, color: LAYER_COLORS[i % LAYER_COLORS.length], visible: L.visible, locked: L.locked, items: L.items })),
   }, name, handle, r.skipped);
 }

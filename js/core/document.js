@@ -53,18 +53,41 @@ function removeItem(id) {
   f.parent.splice(f.index, 1);
   leaves([f.item]).forEach((it) => S.sel.delete(it.id));
 }
+// 単位の換算：形・方向線・線の太さ・押し出し・作業平面の位置を k 倍する（mm ⇔ pt）
+function scaleNodeUnits(n, k) {
+  if (isGroup(n)) { (n.children || []).forEach((c) => scaleNodeUnits(c, k)); return n; }
+  for (const sb of n.subs || []) for (const nd of sb.nodes || []) {
+    nd.x *= k; nd.y *= k;
+    if (nd.hin) nd.hin = P(nd.hin.x * k, nd.hin.y * k);
+    if (nd.hout) nd.hout = P(nd.hout.x * k, nd.hout.y * k);
+  }
+  if (isFinite(n.sw)) n.sw *= k;
+  if (n.x3d) n.x3d = { ...n.x3d, z0: n.x3d.z0 * k, h: n.x3d.h * k };
+  if (n.plane) n.plane = { ...n.plane, o: n.plane.o.map((v) => v * k) };
+  return n;
+}
 function normalizeLeaf(it) {
-  it.id = it.id || uid(); it.rule = it.rule || 'nonzero'; it.sw = isFinite(it.sw) ? it.sw : 1;
+  it.id = it.id || uid(); it.rule = it.rule || 'nonzero'; it.sw = isFinite(it.sw) ? it.sw : 0.35;
   it.hidden = !!it.hidden; it.locked = !!it.locked; it.subs = it.subs || [];
   it.fill = it.fill === undefined ? null : it.fill; it.stroke = it.stroke === undefined ? null : it.stroke;
 }
 // 読み込んだドキュメントの抜けを埋め、ID が重ならないようにする（3D の断面は ID でパスを参照するため）
 function normalizeDoc() {
   doc.version = DOC_VERSION;
-  doc.units = doc.units || 'pt';
-  if (!(doc.width > 0)) doc.width = 595.28;
-  if (!(doc.height > 0)) doc.height = 841.89;
   if (!Array.isArray(doc.guides)) doc.guides = [];
+  if (!Array.isArray(doc.layers)) doc.layers = [];
+  // 前の版（pt）や SVG から読んだもの（pt）は mm に直す
+  if (doc.units !== 'mm') {
+    const k = MM_PER_PT;
+    // アートボードは 0.01mm に丸める（A4 の 595.28pt × 841.89pt → 210 × 297mm）
+    if (doc.width > 0) doc.width = Math.round(doc.width * k * 100) / 100;
+    if (doc.height > 0) doc.height = Math.round(doc.height * k * 100) / 100;
+    doc.guides.forEach((g) => { g.v *= k; });
+    doc.layers.forEach((L) => (L.items || []).forEach((n) => scaleNodeUnits(n, k)));
+    doc.units = 'mm';
+  }
+  if (!(doc.width > 0)) doc.width = 210;
+  if (!(doc.height > 0)) doc.height = 297;
   if (!Array.isArray(doc.solids)) doc.solids = [];
   doc.layers.forEach((L, i) => {
     L.id = L.id || uid(); L.color = L.color || LAYER_COLORS[i % LAYER_COLORS.length];

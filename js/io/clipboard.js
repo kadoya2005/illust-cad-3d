@@ -16,7 +16,7 @@ function pasteSvgText(txt, mode) {
   if (!/<svg[\s>]/i.test(txt || '')) return false;
   try {
     const r = parseSVG(txt);
-    const nodes = r.layers.flatMap((L) => L.items);
+    const nodes = r.layers.flatMap((L) => L.items).map((n) => scaleNodeUnits(n, MM_PER_PT));   // SVG（pt）→ mm
     if (!nodes.length) return false;
     pasteItems(nodes, mode);
     if (r.skipped) toast(`文字や画像など ${r.skipped} 個はまだ読み込めないので飛ばしました`);

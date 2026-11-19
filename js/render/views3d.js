@@ -457,7 +457,7 @@ function moveViewXf(d, q, e) {
     const f = ax === 'x' ? (p) => P(p.x + du, p.y) : (p) => P(p.x, p.y + du);
     items.forEach((it) => mapItem(it, f));
     for (const it of solids) it.x3d.z0 += dz;
-    tip = `${ax === 'x' ? '横' : '奥行き'} ${r2(du)} pt　高さ ${r2(dz)} pt`;
+    tip = `${ax === 'x' ? '横' : '奥行き'} ${r2(du)} mm　高さ ${r2(dz)} mm`;
   } else {
     const h = d.handle;
     const hasE = h.includes('e'), hasW = h.includes('w'), hasN = h.includes('n'), hasS = h.includes('s');
@@ -506,7 +506,7 @@ function moveViewXf(d, q, e) {
     if (create) for (const it of items) if (it.subs.some((sb) => sb.closed && sb.nodes.length >= 2)) it.x3d = { ...(it.x3d || {}), z0: zMin, h: dzc };
     const nr = selRange();
     const w = ax === 'x' ? nr.bb.w : nr.bb.h;
-    tip = `${ax === 'x' ? '幅' : '奥行き'} ${r2(w)} pt　高さ ${r2(nr.zMax - nr.zMin)} pt`;
+    tip = `${ax === 'x' ? '幅' : '奥行き'} ${r2(w)} mm　高さ ${r2(nr.zMax - nr.zMin)} mm`;
   }
   d.tip = tip + (d.snapZ != null ? '　（吸着）' : '');
   render(); updateUI();

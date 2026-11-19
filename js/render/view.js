@@ -18,13 +18,14 @@ const tol = () => 5 / inputScale();   // 5px（操作している図の倍率で
 function stageCenter() { const r = stage.getBoundingClientRect(); return P(r.width / 2, r.height / 2); }
 
 function zoomAt(sp, nz) {
-  nz = Math.min(64, Math.max(0.03125, nz));
+  nz = Math.min(64 * ZOOM_UNIT, Math.max(0.03125 * ZOOM_UNIT, nz));
   const d = toDoc(sp);
   view.z = nz; placeDocAt(d, sp);
   renderView();
 }
 function zoomStep(dir, sp) {
-  const nz = dir > 0 ? ZOOMS.find((z) => z > view.z * 1.001) || 64 : [...ZOOMS].reverse().find((z) => z < view.z / 1.001) || ZOOMS[0];
+  const zs = ZOOMS.map((z) => z * ZOOM_UNIT);
+  const nz = dir > 0 ? zs.find((z) => z > view.z * 1.001) || zs[zs.length - 1] : [...zs].reverse().find((z) => z < view.z / 1.001) || zs[0];
   zoomAt(sp || stageCenter(), nz);
 }
 function fitView() {
@@ -34,7 +35,7 @@ function fitView() {
   // 回転していても入るように、回したアートボードの幅・高さで考える
   const c = Math.abs(Math.cos(view.r)), n = Math.abs(Math.sin(view.r));
   const bw = doc.width * c + doc.height * n, bh = doc.width * n + doc.height * c;
-  view.z = Math.max(0.03125, Math.min((r.width - 2 * m) / bw, (r.height - 2 * m) / bh));
+  view.z = Math.max(0.03125 * ZOOM_UNIT, Math.min((r.width - 2 * m) / bw, (r.height - 2 * m) / bh));
   placeDocAt(P(doc.width / 2, doc.height / 2), P(r.width / 2, r.height / 2));
   if (typeof fitViews3d === 'function') fitViews3d();   // 正面図・側面図も元の大きさに
   renderView();
@@ -146,7 +147,7 @@ function renderView() {
   world.setAttribute('transform', `translate(${view.x} ${view.y}) rotate(${(view.r * 180) / Math.PI}) scale(${view.z})`);
   for (const r of [board, boardEdge]) { r.setAttribute('width', doc.width); r.setAttribute('height', doc.height); }
   const deg = viewDeg();
-  $('zoomLabel').textContent = Math.round(view.z * 1000) / 10 + '%' + (deg ? `　↻${deg}°` : '');
+  $('zoomLabel').textContent = Math.round((view.z / ZOOM_UNIT) * 1000) / 10 + '%' + (deg ? `　↻${deg}°` : '');
   $('zoomLabel').title = deg ? 'クリックで回転ビューをリセット（Ctrl+Shift+1）' : '';
   $('zoomLabel').classList.toggle('rotated', !!deg);
   renderGrid(); drawRulers(); drawOverlay();

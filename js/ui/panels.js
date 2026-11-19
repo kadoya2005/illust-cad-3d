@@ -10,7 +10,7 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
 }
 function setSwatch(el, color) { el.style.background = color || '#ffffff'; el.classList.toggle('none', !color); }
-const r2 = (n) => Math.round(n * 100) / 100;
+const r2 = (n) => Math.round(n * 1000) / 1000;   // 表示は小数3けた（mm。Illustrator と同じ）
 const ICON_EYE = '<svg viewBox="0 0 16 16"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" fill="currentColor"/></svg>';
 const ICON_LOCK = '<svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1" fill="currentColor"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
 
@@ -73,6 +73,7 @@ function updateUI() {
   $('inFill').value = S.fill || '#ffffff'; $('inFill').classList.toggle('none', !S.fill); $('fillNone').classList.toggle('on', !S.fill);
   $('inStroke').value = S.stroke || '#000000'; $('inStroke').classList.toggle('none', !S.stroke); $('strokeNone').classList.toggle('on', !S.stroke);
   if (document.activeElement !== $('inSw')) $('inSw').value = r2(S.sw);
+  $('swUnit').textContent = `mm（${r2(S.sw * PT_PER_MM)}pt）`;   // Illustrator の pt でいくつか
   const bb = items.length ? Geo.bbox(items) : null;
   for (const [id, v] of [['inX', bb && bb.x], ['inY', bb && bb.y], ['inW', bb && bb.w], ['inH', bb && bb.h]]) {
     const el = $(id);
@@ -186,6 +187,8 @@ $('inStroke').addEventListener('input', (e) => setColor('stroke', e.target.value
 $('inStroke').addEventListener('change', () => commit());
 $('fillNone').addEventListener('click', () => setColor('fill', null));
 $('strokeNone').addEventListener('click', () => setColor('stroke', null));
+// 打っているあいだも pt の換算を出す
+$('inSw').addEventListener('input', (e) => { const v = parseFloat(e.target.value); if (v >= 0) $('swUnit').textContent = `mm（${r2(v * PT_PER_MM)}pt）`; });
 $('inSw').addEventListener('change', (e) => {
   const v = parseFloat(e.target.value);
   if (!(v >= 0)) { updateUI(); return; }

@@ -65,7 +65,7 @@ function openXfDialog(kind) {
     const v0 = S.dlgLast.move || { dx: 0, dy: 0 };
     openDialog({
       title: '移動',
-      fields: [{ id: 'dx', label: '水平方向', value: fmt(v0.dx), unit: 'pt' }, { id: 'dy', label: '垂直方向', value: fmt(v0.dy), unit: 'pt' }],
+      fields: [{ id: 'dx', label: '水平方向', value: fmt(v0.dx), unit: 'mm' }, { id: 'dy', label: '垂直方向', value: fmt(v0.dy), unit: 'mm' }],
       apply: (v, copy, pv) => { if (!pv) done('move', { dx: v.dx, dy: v.dy }); applyXf('move', { dx: v.dx, dy: v.dy }, copy, null, pv); },
     });
   } else if (kind === 'rotate') {
@@ -107,9 +107,9 @@ function openXfDialog(kind) {
 function openPrefs() {
   openDialog({
     title: '環境設定',
-    fields: [{ id: 'step', label: 'キー入力（矢印キーで動く量）', value: S.keyStep, unit: 'pt' }],
+    fields: [{ id: 'step', label: 'キー入力（矢印キーで動く量）', value: S.keyStep, unit: 'mm' }],
     copy: false, preview: false,
-    apply: (v) => { if (v.step > 0) { S.keyStep = v.step; savePrefs(); toast(`矢印キーで ${v.step}pt 動きます（Shift で ${v.step * 10}pt）`); } },
+    apply: (v) => { if (v.step > 0) { S.keyStep = v.step; savePrefs(); toast(`矢印キーで ${v.step}mm 動きます（Shift で ${fmt(v.step * 10)}mm）`); } },
   });
 }
 // 平均（Ctrl+Alt+J）：選んだアンカーの位置をそろえる
@@ -139,11 +139,11 @@ function averageAnchors() {
 // パスのオフセット（イラレと同じ項目：オフセット・角の形状・角の比率）
 function openOffsetDialog() {
   if (!S.sel.size) { toast('先にパスを選んでください'); return; }
-  const last = S.dlgLast.offset || { d: 10, join: 'miter', m: 4 };
+  const last = S.dlgLast.offset || { d: 2, join: 'miter', m: 4 };
   openDialog({
     title: 'パスのオフセット',
     fields: [
-      { id: 'd', label: 'オフセット', value: last.d, unit: 'pt（マイナスで内側）' },
+      { id: 'd', label: 'オフセット', value: last.d, unit: 'mm（マイナスで内側）' },
       { id: 'join', type: 'radio', value: last.join, options: [['miter', 'マイター'], ['round', 'ラウンド'], ['bevel', 'ベベル']] },
       { id: 'm', label: '角の比率', value: last.m, unit: '' },
     ],

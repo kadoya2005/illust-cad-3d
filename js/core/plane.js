@@ -135,6 +135,6 @@ function planProjD(it, sp) {
 // ---- 入力の文脈（どの図で操作しているか） ----
 // S.input：正面図・側面図でペンなどを使っているあいだだけ { view, plane, scale, handleHits }。平面図では null
 // ツールには、その作業平面の 2D の座標が渡る。ツール自身は 3D を知らなくてよい
-const inputScale = () => (S.input ? S.input.scale : view.z);   // 1pt が画面で何 px か
+const inputScale = () => (S.input ? S.input.scale : view.z);   // 1mm が画面で何 px か
 // いま操作している平面の上のパスか（平面図では床に平行なパス）。違う平面のパスは選ばない・つながない
 const inInputPlane = (it) => (S.input ? sameFrame(planeOf(it), S.input.plane) : onTop(it));

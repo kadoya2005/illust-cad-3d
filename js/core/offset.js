@@ -2,7 +2,7 @@
 // イラレCAD：パスのオフセット
 // 流れ：ベジェを細かい折れ線にする → Clipper で輪郭を広げる／縮める → 折れ線をベジェに戻す（角はそのまま、曲がった部分は paper.js で曲線に当てはめ）
 
-const OFFSET_SCALE = 1000;     // Clipper は整数で計算するので、pt を 1000 倍して渡す
+const OFFSET_SCALE = 1000;     // Clipper は整数で計算するので、mm を 1000 倍して渡す（1µm 単位）
 const CORNER_DEG = 28;         // 折れ線の向きがこれより大きく変わる点は「角」として残す
 
 // サブパスを折れ線に（曲線は長さに合わせて細かく分ける）
@@ -15,7 +15,7 @@ function polyFromSub(sb) {
     pts.push(P(s[0].x, s[0].y));
     if (Geo.isLine(sb, i)) continue;
     const len = vdist(s[0], s[1]) + vdist(s[1], s[2]) + vdist(s[2], s[3]);
-    const steps = Math.max(8, Math.min(200, Math.ceil(len / 0.75)));
+    const steps = Math.max(8, Math.min(200, Math.ceil(len / 0.25)));
     for (let k = 1; k < steps; k++) pts.push(cubicAt(s[0], s[1], s[2], s[3], k / steps));
   }
   if (!sb.closed) { const l = sb.nodes[sb.nodes.length - 1]; pts.push(P(l.x, l.y)); }
@@ -46,11 +46,11 @@ function subFromPoly(pts, closed) {
     const L = vdist(a, b);
     const straight = run.every((p) => {
       if (L < 1e-9) return true;
-      return Math.abs((b.x - a.x) * (a.y - p.y) - (a.x - p.x) * (b.y - a.y)) / L < 0.05;
+      return Math.abs((b.x - a.x) * (a.y - p.y) - (a.x - p.x) * (b.y - a.y)) / L < 0.02;
     });
     if (straight || run.length < 3) return [{ p: a, hout: null }, { p: b, hin: null }];
     const path = new s.Path({ segments: run.map((p) => [p.x, p.y]), insert: false });
-    path.simplify(0.15);
+    path.simplify(0.05);
     return path.segments.map((sg) => {
       const x = sg.point.x, y = sg.point.y;
       return { p: P(x, y), hin: sg.handleIn.isZero() ? null : P(x + sg.handleIn.x, y + sg.handleIn.y), hout: sg.handleOut.isZero() ? null : P(x + sg.handleOut.x, y + sg.handleOut.y) };
@@ -60,7 +60,7 @@ function subFromPoly(pts, closed) {
   // 角でない区切り（smoothAt）は、あとで方向線を一直線にそろえて、なめらかにつなぐ
   const sharp = new Set(corners);
   const splits = new Set(corners);
-  const LONG = 2;   // pt。これより長い辺は「直線の部分」とみなす
+  const LONG = 0.7;   // mm。これより長い辺は「直線の部分」とみなす
   const ecount = closed ? n : n - 1;
   for (let i = 0; i < ecount; i++) if (vdist(q[i], q[(i + 1) % n]) > LONG) { splits.add(i); splits.add((i + 1) % n); }
   if (closed && !splits.size) for (let k = 0; k < 4; k++) splits.add(Math.floor((n * k) / 4));   // 円など
@@ -111,7 +111,7 @@ function offsetSubs(it, delta, join, miterLimit) {
   const C = ClipperLib;
   const toC = (pts) => pts.map((p) => ({ X: Math.round(p.x * OFFSET_SCALE), Y: Math.round(p.y * OFFSET_SCALE) }));
   const jt = join === 'round' ? C.JoinType.jtRound : join === 'bevel' ? C.JoinType.jtSquare : C.JoinType.jtMiter;
-  const co = new C.ClipperOffset(Math.max(1, miterLimit || 4), 0.02 * OFFSET_SCALE);
+  const co = new C.ClipperOffset(Math.max(1, miterLimit || 4), 0.007 * OFFSET_SCALE);
   const closed = it.subs.filter((sb) => sb.closed && sb.nodes.length >= 2).map((sb) => toC(polyFromSub(sb)));
   if (closed.length) {
     // 穴の向きをそろえてから渡す（複合パスの塗りのルールに合わせる）

@@ -1,10 +1,10 @@
 'use strict';
 // イラレCAD：3D（段階1：押し出し）
-// 押し出しはパスそのものに持たせる：it.x3d = { z0: 底の高さ, h: 高さ }（単位 pt）
+// 押し出しはパスそのものに持たせる：it.x3d = { z0: 底の高さ, h: 高さ }（単位 mm）
 // こうしておくと、コピー・複製・取り消し・保存でそのまま付いてくる
 // 座標：平面図の x は右、y は下（＝手前）、z は上（高さ）
 
-const X3D_DEFAULT_H = 72;   // 押し出すときの最初の高さ（72pt ＝ 1 インチ ＝ 25.4mm）
+const X3D_DEFAULT_H = 10;   // 押し出すときの最初の高さ（mm）
 
 const extrudeOf = (it) => (it && !isGroup(it) && it.x3d && it.x3d.h > 0 && onTop(it) ? it.x3d : null);   // 押し出しは、いまは床に平行なパスだけ
 // 選んでいるパス（グループの中も）のうち、閉じたサブパスがあるもの
@@ -163,7 +163,7 @@ function triangulateCap(outer, holes) {
   }
   return triangulate(outer, holes);
 }
-// 押し出したパス1つ → 三角形の一覧 [[x,y,z]×3]（3D の向き：X 右、Y 奥、Z 上。単位 pt）
+// 押し出したパス1つ → 三角形の一覧 [[x,y,z]×3]（3D の向き：X 右、Y 奥、Z 上。単位 mm）
 function solidTriangles(it) {
   const ex = extrudeOf(it);
   if (!ex) return [];

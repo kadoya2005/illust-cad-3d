@@ -247,7 +247,7 @@ function parseSVG(text) {
 // ---- 書き出し ----
 const svgEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// 押し出し（3D）は data-icad-x3d="底,高さ" で残す（イラレで開いて保存すると消えます）
+// 押し出し（3D）は data-icad-x3d="底,高さ" で残す（SVG の中なので pt。イラレで開いて保存すると消えます）
 function parseX3d(v) {
   const a = (v || '').split(',').map(Number);
   return a.length === 2 && a.every(isFinite) && a[1] > 0 ? { x3d: { z0: a[0], h: a[1] } } : {};
@@ -272,8 +272,9 @@ function nodeToSVG(n, ind) {
   return `${ind}<path ${a.join(' ')}${extra}/>\n`;
 }
 
+// 書き出しは Illustrator に合わせて pt（中の mm を換算する）
 function exportDocSVG(doc) {
-  const w = fmt(doc.width), h = fmt(doc.height);
+  const w = fmt(doc.width * PT_PER_MM), h = fmt(doc.height * PT_PER_MM);
   const ids = new Set();
   let out = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">\n`;
   for (const L of doc.layers) {
@@ -285,7 +286,7 @@ function exportDocSVG(doc) {
     ids.add(id);
     const extra = (L.visible ? '' : ' style="display:none"') + (L.locked ? ' data-locked="true"' : '');
     out += `  <g id="${svgEsc(id)}" data-name="${svgEsc(L.name)}"${extra}>\n`;
-    for (const n of L.items) out += nodeToSVG(n, '    ');
+    for (const n of L.items) out += nodeToSVG(scaleNodeUnits(clone(n), PT_PER_MM), '    ');
     out += '  </g>\n';
   }
   return out + '</svg>\n';
@@ -293,6 +294,7 @@ function exportDocSVG(doc) {
 
 // コピー用：選んだものだけの SVG（nodes はパスかグループ）
 function exportItemsSVG(nodes) {
+  nodes = nodes.map((n) => scaleNodeUnits(clone(n), PT_PER_MM));
   const ls = [];
   const walk = (arr) => arr.forEach((n) => (n.type === 'group' ? walk(n.children) : ls.push(n)));
   walk(nodes);

@@ -5,7 +5,7 @@ const STL_TYPE = { description: 'STL（3D プリンター用）', accept: { 'mod
 
 // 押し出しをすべて三角形にして、バイナリの STL にする
 function buildSTL(items) {
-  const k = 1 / PT_PER_MM;   // pt → mm
+  const k = 1;   // 中の値がもう mm
   const tris = [];
   for (const it of items) for (const t of solidTriangles(it)) tris.push(t);
   const buf = new ArrayBuffer(84 + tris.length * 50);

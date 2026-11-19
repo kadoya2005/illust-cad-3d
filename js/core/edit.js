@@ -210,7 +210,7 @@ function joinPaths() {
   if (!cands.length) { toast('連結できる開いたパスが選ばれていません'); return; }
   if (cands.length === 1) {
     const n = cands[0].sb.nodes, a = n[0], b = n[n.length - 1];
-    if (n.length > 2 && vdist(a, b) < 0.01) { a.hin = b.hin; a.smooth = false; n.pop(); }
+    if (n.length > 2 && vdist(a, b) < 0.004) { a.hin = b.hin; a.smooth = false; n.pop(); }
     cands[0].sb.closed = true;
     render(); commit(); return;
   }
@@ -226,7 +226,7 @@ function joinPaths() {
     if (best.ra) reverseSub(A.sb);
     if (best.rb) reverseSub(B.sb);
     const an = A.sb.nodes, bn = B.sb.nodes, last = an[an.length - 1], first = bn[0];
-    if (best.d < 0.01) { last.hout = first.hout; last.smooth = false; an.push(...bn.slice(1)); }
+    if (best.d < 0.004) { last.hout = first.hout; last.smooth = false; an.push(...bn.slice(1)); }
     else { last.hout = null; first.hin = null; an.push(...bn); }
     B.it.subs.splice(B.it.subs.indexOf(B.sb), 1);
     if (!B.it.subs.length) removeItem(B.it.id);

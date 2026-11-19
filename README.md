@@ -89,7 +89,7 @@ Adobe Illustrator とは関係のない、非公式のツールです。
 
 ```
 doc = {
-  version: 2, units: 'pt', width, height,
+  version: 3, units: 'mm', width, height,
   guides: [{ axis: 'x' | 'y', v }],
   layers: [{ id, name, color, visible, locked, items: [パス or グループ] }],
   solids: []   // 3D の形を置く場所（断面はパスの ID で参照。レイヤーとは別に持つ）
@@ -99,7 +99,7 @@ doc = {
 グループ = { id, type: 'group', name, children: [...], hidden, locked }
 ```
 
-- 座標の単位は pt（イラレの SVG と同じ）。STL の書き出しのときに mm へ換算します
+- 座標の単位は mm（線の太さも mm）。Illustrator とのやりとり（SVG の読み書き・コピペ）のときだけ pt に換算します。前の版の .icad（pt）は開くときに mm に直します
 - 3D の向き：平面図の x が右、平面図の下（y が大きい方）が手前、z が上
 - ハンドル `hin` / `hout` は絶対座標。`null` はハンドルなし
 - ID は保存・読み込み（`.icad` でも SVG の `data-icad-id` でも）で変わりません
