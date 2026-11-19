@@ -37,7 +37,10 @@ function isTopPlane(pl) {
     && Math.abs(pl.v[0]) < 1e-9 && Math.abs(pl.v[1] - 1) < 1e-9 && Math.abs(pl.v[2]) < 1e-9
     && Math.abs(pl.o[0]) < 1e-9 && Math.abs(pl.o[1]) < 1e-9;
 }
-const onTop = (it) => !it.plane || isTopPlane(it.plane);
+// 平面図で扱うパスか：床に平行なもの、または折りたたみの面（平面図では展開図のまま直せる）
+const onTop = (it) => !it.plane || !!it.fold || isTopPlane(it.plane);
+// 3D で本当に床に平行に置かれているか（折った面は含まない）
+const flatOnFloor = (it) => !it.plane || isTopPlane(it.plane);
 // 平面の向き（法線）
 const planeNormal = (pl) => v3cross(pl.u, pl.v);
 // 正面・側面・床・そのほか（表示の名前などに使う）
@@ -107,7 +110,7 @@ function worldRange(items) {
     else { r.x0 = Math.min(r.x0, w.x); r.x1 = Math.max(r.x1, w.x); r.y0 = Math.min(r.y0, w.y); r.y1 = Math.max(r.y1, w.y); r.z0 = Math.min(r.z0, w.z); r.z1 = Math.max(r.z1, w.z); }
   };
   for (const it of items) {
-    if (onTop(it)) {
+    if (flatOnFloor(it)) {
       const bb = Geo.bbox([it]);
       if (!bb) continue;
       const x = typeof extrudeOf === 'function' ? extrudeOf(it) : null;

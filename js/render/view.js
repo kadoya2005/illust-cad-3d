@@ -54,6 +54,7 @@ function renderNodes(arr) {
   return h;
 }
 function renderArt() {
+  if (typeof applyFolds === 'function') applyFolds();   // 折りたたみの面の 3D の位置を、角度から決め直す
   let h = '';
   for (const L of doc.layers) if (L.visible) h += '<g>' + renderNodes(L.items) + '</g>';
   art.innerHTML = h;

@@ -104,6 +104,14 @@ function updateUI() {
   }
   $('btnExtrude').disabled = !prof.length;
   $('btnUnextrude').disabled = !exs.some(Boolean);
+  // 折りたたみ：選んだ面の角度（ばらばらなら空欄）
+  const fs = selectedFoldFaces();
+  const degs = fs.movable.map((it) => (it.fold && it.fold.deg) || 0);
+  const fd = $('inFoldDeg');
+  fd.disabled = !fs.movable.length;
+  if (document.activeElement !== fd) fd.value = degs.length && degs.every((d) => d === degs[0]) ? r2(degs[0]) : '';
+  $('btnFold90').disabled = $('btnFold0').disabled = !fs.movable.length;
+  $('foldNote').textContent = fs.movable.length ? '' : fs.roots.length ? '土台の面です（動きません）' : fs.alone.length ? 'ほかの面と辺がつながっていません' : '辺をぴったり重ねた面を選ぶと折れます';
   const flags = [];
   if (S.smart) flags.push('スマートガイド');
   if (S.snapGrid) flags.push('グリッドにスナップ');
@@ -214,6 +222,10 @@ for (const id of ['inX', 'inY', 'inW', 'inH']) {
 $('inExH').addEventListener('change', () => { const v = parseFloat($('inExH').value); if (v > 0) setExtrude(v, undefined); else updateUI(); });
 $('inExZ').addEventListener('change', () => { const v = parseFloat($('inExZ').value); if (isFinite(v)) setExtrude(undefined, v); else updateUI(); });
 $('btnExtrude').addEventListener('click', () => setExtrude(parseFloat($('inExH').value), undefined));
+$('inFoldDeg').addEventListener('change', () => { const v = parseFloat($('inFoldDeg').value); if (isFinite(v)) setFold(v); else updateUI(); });
+$('btnFold90').addEventListener('click', () => setFold(90));
+$('btnFold0').addEventListener('click', () => setFold(0));
+$('btnUnfoldAll').addEventListener('click', unfoldAll);
 $('btnUnextrude').addEventListener('click', removeExtrude);
 for (const [id, prop] of [['inBW', 'width'], ['inBH', 'height']]) {
   $(id).addEventListener('change', () => {

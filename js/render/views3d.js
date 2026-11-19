@@ -82,16 +82,33 @@ function disposeMesh(m) {
 // パスごとに覚えておき、形・置き場所・色が変わったときだけ作り直す
 function flatLine(it) {
   const col = it.stroke || it.fill || '#999999';
-  const key = JSON.stringify(it.subs) + JSON.stringify(it.plane || null) + col;
+  const key = JSON.stringify(it.subs) + JSON.stringify(it.plane || null) + col + (FOLD_SHOW.has(it.id) ? '|' + it.fill : '');
   let m = V3.flatCache.get(it.id);
   if (m && m.key === key) return m;
   if (m) { if (m.group.parent) m.group.parent.remove(m.group); disposeGroup(m.group); }
   const g = new THREE.Group();
-  const lift = onTop(it) ? 0.05 : 0;   // 床の線は、アートボードの板に埋もれないよう少しだけ上に
+  const lift = flatOnFloor(it) ? 0.05 : 0;   // 床の線は、アートボードの板に埋もれないよう少しだけ上に
   for (const sb of it.subs) {
     if (sb.nodes.length < 2) continue;
     const pts = subWorldPts(it, sb).map((w) => toThree({ x: w.x, y: w.y, z: w.z + lift }));
     g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: new THREE.Color(col) })));
+  }
+  // 折りたたみの面は、塗りのある板として見せる（クリックでも選べる）
+  if (FOLD_SHOW.has(it.id) && it.fill) {
+    const pl = planeOf(it), pos = [];
+    for (const sh of profileShapes(it)) {
+      const { pts, tris } = triangulateCap(sh.outer, sh.holes);
+      const W = pts.map((p) => toThree(toWorld(pl, p)));
+      for (const t of tris) for (const i of t) pos.push(W[i].x, W[i].y, W[i].z);
+    }
+    if (pos.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: new THREE.Color(it.fill), side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
+      mesh.userData.id = it.id;
+      g.add(mesh);
+    }
   }
   g.userData.id = it.id;
   m = { key, group: g };
@@ -201,7 +218,7 @@ function renderViews() {
     vw.renderer.render(scene, cam);
     drawViewBox(v.id);   // 選んでいるものの枠
     vw.label.textContent = v.name + (isRotated(v.id) ? '（回転中・ダブルクリックで戻る）' : '');
-    vw.hint.textContent = !solids.length && v.id === 'viewFront' ? 'パスを選んで、パネルの「3D 押し出し」で高さを入れると、ここに立体が出ます' : '';
+    vw.hint.textContent = !solids.length && !FOLD_SHOW.size && v.id === 'viewFront' ? 'パスを選んで、パネルの「3D 押し出し」で高さを入れると、ここに立体が出ます' : '';
   }
 }
 
@@ -213,6 +230,7 @@ function hitView(id, x, y) {
   const rc = new THREE.Raycaster();
   rc.setFromCamera(new THREE.Vector2((x / r.width) * 2 - 1, -(y / r.height) * 2 + 1), vw.camera);
   const meshes = [...V3.meshes.values()].map((m) => m.mesh);
+  for (const m of V3.flatCache.values()) for (const o of m.group.children) if (o.isMesh) meshes.push(o);   // 折りたたみの面
   const hit = rc.intersectObjects(meshes, false)[0];
   return hit ? hit.object.userData.id : null;
 }
@@ -273,7 +291,7 @@ function selRange() {
   if (!wr) return null;
   const bb = { x: wr.x0, y: wr.y0, w: wr.x1 - wr.x0, h: wr.y1 - wr.y0 };
   // planar：全部が床に平行なパス（いまの押し出しの編集ができるのはこのときだけ）
-  return { items, bb, zMin: wr.z0, zMax: wr.z1, planar: items.every(onTop) };
+  return { items, bb, zMin: wr.z0, zMax: wr.z1, planar: items.every(flatOnFloor) };
 }
 // その図の画面での、選んでいるものの枠（px）
 function viewBox(id) {

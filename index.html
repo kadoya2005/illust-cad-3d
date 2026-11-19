@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>イラレCAD</title>
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 <header id="topbar">
@@ -160,6 +160,18 @@
     </div>
   </section>
   <section>
+    <h2>折りたたみ <span class="note">試作</span></h2>
+    <div class="grid2 ex3d">
+      <label title="選んだ面を、つながっている面に対して何度起こすか（上へ ＋）">角度 °</label><input type="number" id="inFoldDeg" step="any" min="-180" max="180">
+    </div>
+    <div class="row ex3dBtns">
+      <button id="btnFold90" title="選んだ面を 90° 起こす">90°</button>
+      <button id="btnFold0" title="選んだ面を開く（0°）">開く</button>
+      <button id="btnUnfoldAll" title="全部の面を開いて、展開図に戻す">全部開く</button>
+    </div>
+    <div class="note" id="foldNote"></div>
+  </section>
+  <section>
     <h2>アートボード <span class="note">mm</span></h2>
     <div class="grid2">
       <label>幅</label><input type="number" id="inBW" step="any" min="1">
@@ -217,38 +229,39 @@
   ui     … マウス・キーボード・パネル・ダイアログ
   io     … ファイルとクリップボード
 -->
-<script src="js/vendor/paper-core.min.js?v=18"></script>
-<script src="js/vendor/clipper.js?v=18"></script>
-<script src="js/vendor/three.min.js?v=18"></script>
-<script src="js/core/geom.js?v=18"></script>
-<script src="js/core/config.js?v=18"></script>
-<script src="js/core/plane.js?v=18"></script>
-<script src="js/core/state.js?v=18"></script>
-<script src="js/core/document.js?v=18"></script>
-<script src="js/core/selection.js?v=18"></script>
-<script src="js/core/history.js?v=18"></script>
-<script src="js/core/prefs.js?v=18"></script>
-<script src="js/core/snap.js?v=18"></script>
-<script src="js/core/pathfinder.js?v=18"></script>
-<script src="js/core/offset.js?v=18"></script>
-<script src="js/core/solids.js?v=18"></script>
-<script src="js/io/svgio.js?v=18"></script>
-<script src="js/render/view.js?v=18"></script>
-<script src="js/render/hittest.js?v=18"></script>
-<script src="js/render/views3d.js?v=18"></script>
-<script src="js/core/edit.js?v=18"></script>
-<script src="js/tools/drag.js?v=18"></script>
-<script src="js/tools/transform.js?v=18"></script>
-<script src="js/tools/shapes.js?v=18"></script>
-<script src="js/tools/tools.js?v=18"></script>
-<script src="js/ui/dialogs.js?v=18"></script>
-<script src="js/ui/mouse.js?v=18"></script>
-<script src="js/ui/keyboard.js?v=18"></script>
-<script src="js/io/clipboard.js?v=18"></script>
-<script src="js/io/files.js?v=18"></script>
-<script src="js/io/stl.js?v=18"></script>
-<script src="js/ui/panels.js?v=18"></script>
-<script src="js/ui/help.js?v=18"></script>
-<script src="js/app.js?v=18"></script>
+<script src="js/vendor/paper-core.min.js?v=19"></script>
+<script src="js/vendor/clipper.js?v=19"></script>
+<script src="js/vendor/three.min.js?v=19"></script>
+<script src="js/core/geom.js?v=19"></script>
+<script src="js/core/config.js?v=19"></script>
+<script src="js/core/plane.js?v=19"></script>
+<script src="js/core/state.js?v=19"></script>
+<script src="js/core/document.js?v=19"></script>
+<script src="js/core/selection.js?v=19"></script>
+<script src="js/core/history.js?v=19"></script>
+<script src="js/core/prefs.js?v=19"></script>
+<script src="js/core/snap.js?v=19"></script>
+<script src="js/core/pathfinder.js?v=19"></script>
+<script src="js/core/offset.js?v=19"></script>
+<script src="js/core/solids.js?v=19"></script>
+<script src="js/core/fold.js?v=19"></script>
+<script src="js/io/svgio.js?v=19"></script>
+<script src="js/render/view.js?v=19"></script>
+<script src="js/render/hittest.js?v=19"></script>
+<script src="js/render/views3d.js?v=19"></script>
+<script src="js/core/edit.js?v=19"></script>
+<script src="js/tools/drag.js?v=19"></script>
+<script src="js/tools/transform.js?v=19"></script>
+<script src="js/tools/shapes.js?v=19"></script>
+<script src="js/tools/tools.js?v=19"></script>
+<script src="js/ui/dialogs.js?v=19"></script>
+<script src="js/ui/mouse.js?v=19"></script>
+<script src="js/ui/keyboard.js?v=19"></script>
+<script src="js/io/clipboard.js?v=19"></script>
+<script src="js/io/files.js?v=19"></script>
+<script src="js/io/stl.js?v=19"></script>
+<script src="js/ui/panels.js?v=19"></script>
+<script src="js/ui/help.js?v=19"></script>
+<script src="js/app.js?v=19"></script>
 </body>
 </html>

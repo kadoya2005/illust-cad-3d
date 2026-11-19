@@ -164,6 +164,7 @@ function shapeToItem(el, ctx) {
     locked: el.getAttribute('data-locked') === 'true',
     ...parseX3d(el.getAttribute('data-icad-x3d')),
     ...parsePlane(el.getAttribute('data-icad-plane')),
+    ...parseFold(el.getAttribute('data-icad-fold')),
   };
 }
 
@@ -257,10 +258,17 @@ function parsePlane(v) {
   const a = (v || '').split(',').map(Number);
   return a.length === 9 && a.every(isFinite) ? { plane: { o: a.slice(0, 3), u: a.slice(3, 6), v: a.slice(6, 9) } } : {};
 }
+// 折りたたみの角度は data-icad-fold="角度"（重しの面は "角度,fixed"）
+function parseFold(v) {
+  if (!v) return {};
+  const [d, f] = v.split(',');
+  return isFinite(+d) ? { fold: { deg: +d, ...(f === 'fixed' ? { fixed: true } : {}) } } : {};
+}
+const foldAttr = (n) => (n.fold ? ` data-icad-fold="${fmt(n.fold.deg || 0)}${n.fold.fixed ? ',fixed' : ''}"` : '');
 const planeAttr = (n) => (n.plane ? ` data-icad-plane="${[...n.plane.o, ...n.plane.u, ...n.plane.v].map(fmt).join(',')}"` : '');
 function nodeToSVG(n, ind) {
   // data-icad-id：読み込み直しても ID が変わらないように（3D の断面が ID で参照するため）
-  const extra = ` data-icad-id="${svgEsc(n.id)}"` + (n.x3d ? ` data-icad-x3d="${fmt(n.x3d.z0)},${fmt(n.x3d.h)}"` : '') + planeAttr(n) + (n.locked ? ' data-locked="true"' : '') + (n.hidden ? ' style="display:none"' : '');
+  const extra = ` data-icad-id="${svgEsc(n.id)}"` + (n.x3d ? ` data-icad-x3d="${fmt(n.x3d.z0)},${fmt(n.x3d.h)}"` : '') + planeAttr(n) + foldAttr(n) + (n.locked ? ' data-locked="true"' : '') + (n.hidden ? ' style="display:none"' : '');
   if (n.type === 'group') {
     const name = n.name ? ` data-name="${svgEsc(n.name)}"` : '';
     return `${ind}<g${name}${extra}>\n` + n.children.map((c) => nodeToSVG(c, ind + '  ')).join('') + `${ind}</g>\n`;

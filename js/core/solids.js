@@ -6,7 +6,7 @@
 
 const X3D_DEFAULT_H = 10;   // 押し出すときの最初の高さ（mm）
 
-const extrudeOf = (it) => (it && !isGroup(it) && it.x3d && it.x3d.h > 0 && onTop(it) ? it.x3d : null);   // 押し出しは、いまは床に平行なパスだけ
+const extrudeOf = (it) => (it && !isGroup(it) && it.x3d && it.x3d.h > 0 && flatOnFloor(it) ? it.x3d : null);   // 押し出しは、いまは床に平行なパスだけ
 // 選んでいるパス（グループの中も）のうち、閉じたサブパスがあるもの
 function selectedProfileLeaves() {
   return leaves(selectedTops().map((t) => t.node)).filter((it) => it.subs.some((sb) => sb.closed && sb.nodes.length >= 2));
