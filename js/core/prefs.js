@@ -1,7 +1,7 @@
 'use strict';
 // イラレCAD：表示の設定（定規・グリッドなど）をブラウザに覚えておく
 
-const PREF_FLAGS = ['rulers', 'grid', 'snapGrid', 'smart', 'showGuides', 'guidesLocked', 'show3d'];
+const PREF_FLAGS = ['rulers', 'grid', 'snapGrid', 'smart', 'showGuides', 'guidesLocked', 'show3d', 'planFolded'];
 function savePrefs() {
   try {
     const p = { keyStepMm: S.keyStep };

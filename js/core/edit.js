@@ -278,6 +278,8 @@ function swapColors() {
 function toggleActiveColor() { S.activeColor = S.activeColor === 'fill' ? 'stroke' : 'fill'; updateUI(); }
 
 // ---- 表示の切り替え ----
+// 平面図：展開図 ⇔ 組み立てた形（真上から見たところ）
+function togglePlanFolded() { S.planFolded = !S.planFolded; savePrefs(); cleanSel(); render(); updateUI(); toast(S.planFolded ? '平面図：組み立てた形（折った面は平面図では直せません）' : '平面図：展開図'); }
 function togglePref(k) { S[k] = !S[k]; savePrefs(); renderView(); updateUI(); }
 const toggleRulers = () => togglePref('rulers');
 // 正面図・側面図を出す／しまう

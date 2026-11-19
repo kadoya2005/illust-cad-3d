@@ -28,7 +28,7 @@ const S = {
   fill: '#ffffff', stroke: '#000000', sw: 0.35, activeColor: 'fill',
   drawing: null,             // ペンで描いている途中のパス { id, s }
   outline: false,
-  rulers: false, grid: false, snapGrid: false, smart: true, showGuides: true, guidesLocked: false, show3d: true, lastExH: 0,
+  rulers: false, grid: false, snapGrid: false, smart: true, showGuides: true, guidesLocked: false, show3d: true, planFolded: false, lastExH: 0,
   selGuide: null, snapViz: null, snapCache: null, jis: true,
   xfOrigin: null,            // 回転・リフレクト・拡大縮小の基準点（null なら選択範囲の中心）
   keyStep: 0.1,              // 矢印キーで動く量（mm）。Ctrl+K で変更

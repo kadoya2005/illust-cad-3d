@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>イラレCAD</title>
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 <header id="topbar">
@@ -169,6 +169,9 @@
       <button id="btnFold0" title="選んだ面を開く（0°）">開く</button>
       <button id="btnUnfoldAll" title="全部の面を開いて、展開図に戻す">全部開く</button>
     </div>
+    <div class="row ex3dBtns">
+      <button id="btnPlanFolded" title="平面図を、展開図か、組み立てた形（真上から見たところ）か切り替える">平面図：展開図</button>
+    </div>
     <div class="note" id="foldNote"></div>
   </section>
   <section>
@@ -229,39 +232,39 @@
   ui     … マウス・キーボード・パネル・ダイアログ
   io     … ファイルとクリップボード
 -->
-<script src="js/vendor/paper-core.min.js?v=19"></script>
-<script src="js/vendor/clipper.js?v=19"></script>
-<script src="js/vendor/three.min.js?v=19"></script>
-<script src="js/core/geom.js?v=19"></script>
-<script src="js/core/config.js?v=19"></script>
-<script src="js/core/plane.js?v=19"></script>
-<script src="js/core/state.js?v=19"></script>
-<script src="js/core/document.js?v=19"></script>
-<script src="js/core/selection.js?v=19"></script>
-<script src="js/core/history.js?v=19"></script>
-<script src="js/core/prefs.js?v=19"></script>
-<script src="js/core/snap.js?v=19"></script>
-<script src="js/core/pathfinder.js?v=19"></script>
-<script src="js/core/offset.js?v=19"></script>
-<script src="js/core/solids.js?v=19"></script>
-<script src="js/core/fold.js?v=19"></script>
-<script src="js/io/svgio.js?v=19"></script>
-<script src="js/render/view.js?v=19"></script>
-<script src="js/render/hittest.js?v=19"></script>
-<script src="js/render/views3d.js?v=19"></script>
-<script src="js/core/edit.js?v=19"></script>
-<script src="js/tools/drag.js?v=19"></script>
-<script src="js/tools/transform.js?v=19"></script>
-<script src="js/tools/shapes.js?v=19"></script>
-<script src="js/tools/tools.js?v=19"></script>
-<script src="js/ui/dialogs.js?v=19"></script>
-<script src="js/ui/mouse.js?v=19"></script>
-<script src="js/ui/keyboard.js?v=19"></script>
-<script src="js/io/clipboard.js?v=19"></script>
-<script src="js/io/files.js?v=19"></script>
-<script src="js/io/stl.js?v=19"></script>
-<script src="js/ui/panels.js?v=19"></script>
-<script src="js/ui/help.js?v=19"></script>
-<script src="js/app.js?v=19"></script>
+<script src="js/vendor/paper-core.min.js?v=21"></script>
+<script src="js/vendor/clipper.js?v=21"></script>
+<script src="js/vendor/three.min.js?v=21"></script>
+<script src="js/core/geom.js?v=21"></script>
+<script src="js/core/config.js?v=21"></script>
+<script src="js/core/plane.js?v=21"></script>
+<script src="js/core/state.js?v=21"></script>
+<script src="js/core/document.js?v=21"></script>
+<script src="js/core/selection.js?v=21"></script>
+<script src="js/core/history.js?v=21"></script>
+<script src="js/core/prefs.js?v=21"></script>
+<script src="js/core/snap.js?v=21"></script>
+<script src="js/core/pathfinder.js?v=21"></script>
+<script src="js/core/offset.js?v=21"></script>
+<script src="js/core/solids.js?v=21"></script>
+<script src="js/core/fold.js?v=21"></script>
+<script src="js/io/svgio.js?v=21"></script>
+<script src="js/render/view.js?v=21"></script>
+<script src="js/render/hittest.js?v=21"></script>
+<script src="js/render/views3d.js?v=21"></script>
+<script src="js/core/edit.js?v=21"></script>
+<script src="js/tools/drag.js?v=21"></script>
+<script src="js/tools/transform.js?v=21"></script>
+<script src="js/tools/shapes.js?v=21"></script>
+<script src="js/tools/tools.js?v=21"></script>
+<script src="js/ui/dialogs.js?v=21"></script>
+<script src="js/ui/mouse.js?v=21"></script>
+<script src="js/ui/keyboard.js?v=21"></script>
+<script src="js/io/clipboard.js?v=21"></script>
+<script src="js/io/files.js?v=21"></script>
+<script src="js/io/stl.js?v=21"></script>
+<script src="js/ui/panels.js?v=21"></script>
+<script src="js/ui/help.js?v=21"></script>
+<script src="js/app.js?v=21"></script>
 </body>
 </html>

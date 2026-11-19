@@ -38,7 +38,8 @@ function isTopPlane(pl) {
     && Math.abs(pl.o[0]) < 1e-9 && Math.abs(pl.o[1]) < 1e-9;
 }
 // 平面図で扱うパスか：床に平行なもの、または折りたたみの面（平面図では展開図のまま直せる）
-const onTop = (it) => !it.plane || !!it.fold || isTopPlane(it.plane);
+// 「平面図を組み立てた形で見る」（S.planFolded）のときは、折った面は真上から見た形になり、平面図では直せない
+const onTop = (it) => !it.plane || (!!it.fold && !S.planFolded) || isTopPlane(it.plane);
 // 3D で本当に床に平行に置かれているか（折った面は含まない）
 const flatOnFloor = (it) => !it.plane || isTopPlane(it.plane);
 // 平面の向き（法線）
@@ -130,7 +131,7 @@ function planProjD(it, sp) {
   for (const sb of it.subs) {
     if (sb.nodes.length < 2) continue;
     const pts = subWorldPts(it, sb).map((w) => (sp ? sp(P(w.x, w.y)) : P(w.x, w.y)));
-    d += pts.map((p, i) => `${i ? 'L' : 'M'}${fmt(p.x)} ${fmt(p.y)}`).join('');
+    d += pts.map((p, i) => `${i ? 'L' : 'M'}${fmt(p.x)} ${fmt(p.y)}`).join('') + (sb.closed ? 'Z' : '');
   }
   return d;
 }

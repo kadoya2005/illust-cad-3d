@@ -340,6 +340,12 @@ function viewToLocal(id, q, pl) {
   rc.setFromCamera(new THREE.Vector2((q.x / r.width) * 2 - 1, -(q.y / r.height) * 2 + 1), vw.camera);
   return rayToLocal(pl, rc.ray) || P(0, 0);
 }
+// アプリの 3D の点 → 図の画面の点
+function localToViewW(id, w) {
+  const vw = V3.views[id], r = vw.box.getBoundingClientRect();
+  const pr = toThree(w).project(vw.camera);
+  return P(((pr.x + 1) / 2) * r.width, ((1 - pr.y) / 2) * r.height);
+}
 // 作業平面の 2D の点 → 図の画面の点
 function localToView(id, pl, p) {
   const vw = V3.views[id], r = vw.box.getBoundingClientRect();
@@ -586,6 +592,17 @@ for (const v of VIEWS) {
     // 立体・線をクリック
     const id = hitView(v.id, q.x, q.y) || hitFlat(v.id, q);
     const f = id && findItem(id);
+    // 折れる面：ドラッグで起こす（マウスについてくる）。回して見ている図でもできる
+    if (f && !e.shiftKey && FOLD_INFO.has(f.item.id)) {
+      if (!S.sel.has(f.item.id)) { S.sel.clear(); selItem(f.item, false); }
+      afterSelect(); render(); updateUI();
+      const faces = selectedFoldFaces().movable;
+      if (!faces.includes(f.item)) faces.push(f.item);
+      grab();
+      if (V3.fit) V3.hold = V3.fit;
+      drag = { type: 'fold', view: v.id, it: f.item, faces, s: q, deg0: (f.item.fold && f.item.fold.deg) || 0, moved: false };
+      return;
+    }
     if (f) {
       const target = topOf(f.item);
       const ls = leaves([target]);
@@ -605,6 +622,16 @@ for (const v of VIEWS) {
     const q = local(e);
     if (!drag) { hoverView(v.id, q); return; }
     if (drag.type === 'pen') { viewPenMove(e, q); return; }
+    if (drag.type === 'fold') {
+      if (!drag.moved && Math.hypot(q.x - drag.s.x, q.y - drag.s.y) < 3) return;
+      drag.moved = true;
+      const raw = foldAngleToward(drag.it, (w) => localToViewW(v.id, w), q, (drag.it.fold && drag.it.fold.deg) || 0);
+      const deg = snapFoldDeg(raw, e.shiftKey);
+      for (const it of drag.faces) it.fold = { ...(it.fold || {}), deg };   // 選んでいる面は同じ角度に
+      render(); updateUI();
+      showTip(v.id, q, `角度 ${r2(deg)}°`);
+      return;
+    }
     if (drag.type === 'vxf') { moveViewXf(drag, q, e); showTip(v.id, q, drag.moved ? drag.tip : ''); return; }
     if (drag.type === 'pan') V3.pan[v.id] = P(drag.o.x + q.x - drag.s.x, drag.o.y + q.y - drag.s.y);
     else {
@@ -620,6 +647,7 @@ for (const v of VIEWS) {
   const end = (e) => {
     if (!drag) return;
     if (drag.type === 'pen') endViewPen(e, local(e));
+    if (drag.type === 'fold') { V3.hold = null; showTip(v.id, null, ''); if (drag.moved) commit(); renderViews(); }
     if (drag.type === 'vxf') { endViewXf(drag); showTip(v.id, null, ''); }
     drag = null; updateCursor();
   };

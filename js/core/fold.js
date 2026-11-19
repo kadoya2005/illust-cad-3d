@@ -92,18 +92,21 @@ function rotateFrame(pf, e, face, deg) {
 const isIdentityFrame = (pl) => v3len(pl.o) < 1e-9 && v3len(v3sub(pl.u, [1, 0, 0])) < 1e-9 && v3len(v3sub(pl.v, [0, 1, 0])) < 1e-9;
 
 // 角度から、面の 3D の位置（it.plane）を決め直す。描き直しのたびに呼ぶ
-// 板として見せる面（どこかが折れているまとまりの面）。ただ並べただけの四角は、今までどおり線で見せる
+// 板として見せる面（ほかの面と折り線でつながっている面）
 const FOLD_SHOW = new Set();
+// 折れる面ごとに：親の面の座標の取り方（pf）と折り線（e）。ドラッグで折るときに使う
+const FOLD_INFO = new Map();
 function applyFolds() {
-  FOLD_SHOW.clear();
+  FOLD_SHOW.clear(); FOLD_INFO.clear();
   for (const t of foldTrees()) {
-    if (t.comp.length > 1 && t.comp.some((f) => f.fold && f.fold.deg)) t.comp.forEach((f) => FOLD_SHOW.add(f.id));
+    if (t.comp.length > 1) t.comp.forEach((f) => FOLD_SHOW.add(f.id));   // つながった面は、開いていても板で見せる（正面図・側面図でつかめるように）
     const frames = new Map([[t.root.id, PLANE_TOP]]);
     for (const f of t.order) {
       if (f === t.root) continue;
       const pr = t.parent.get(f.id), pf = frames.get(pr.face.id);
       const deg = (f.fold && f.fold.deg) || 0;
       frames.set(f.id, deg ? rotateFrame(pf, pr.e, f, deg) : pf);
+      FOLD_INFO.set(f.id, { pf, e: pr.e });
     }
     for (const f of t.comp) {
       const fr = frames.get(f.id) || PLANE_TOP;
@@ -141,4 +144,25 @@ function unfoldAll() {
   for (const it of leaves(doc.layers.flatMap((L) => L.items))) if (it.fold && it.fold.deg) { it.fold = { ...it.fold, deg: 0 }; n++; }
   if (!n) return;
   render(); commit();
+}
+
+// ---- 正面図・側面図で、面をドラッグして起こす ----
+// 面の真ん中が、マウスにいちばん近づく角度を探す（面がマウスについてくる）
+// 真横から見ていると、同じ位置になる角度が2つあることがあるので、今の角度に近い方を選ぶ
+const faceCenter2 = (it) => { const ns = it.subs[0].nodes; return P(ns.reduce((s, n) => s + n.x, 0) / ns.length, ns.reduce((s, n) => s + n.y, 0) / ns.length); };
+function foldAngleToward(it, toScreen, q, prevDeg) {
+  const fi = FOLD_INFO.get(it.id);
+  if (!fi) return prevDeg;
+  const c2 = faceCenter2(it);
+  const cost = (deg) => { const s = toScreen(toWorld(rotateFrame(fi.pf, fi.e, it, deg), c2)); return Math.hypot(s.x - q.x, s.y - q.y) + Math.abs(deg - prevDeg) * 0.02; };
+  let best = prevDeg, bc = cost(prevDeg);
+  for (let d = -180; d <= 180; d += 2) { const c = cost(d); if (c < bc) { bc = c; best = d; } }
+  for (let d = best - 2; d <= best + 2; d += 0.1) { const c = cost(d); if (c < bc) { bc = c; best = d; } }
+  return Math.max(-180, Math.min(180, best));
+}
+// 吸着：0°・±90°・±180° の近く（4° 以内）に吸い付く。Shift で 15° ずつ
+function snapFoldDeg(deg, shift) {
+  if (shift) return Math.round(deg / 15) * 15;
+  for (const s of [0, 90, -90, 180, -180]) if (Math.abs(deg - s) <= 4) return s;
+  return Math.round(deg * 10) / 10;
 }

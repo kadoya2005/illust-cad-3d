@@ -27,7 +27,7 @@ const MENUS = {
   view: [
     ['アウトライン', 'Ctrl+Y', toggleOutline, () => S.outline], ['アートボード全体', 'Ctrl+0', fitView], ['100%', 'Ctrl+1', () => zoomAt(stageCenter(), 1)], ['回転ビューをリセット', 'Ctrl+Shift+1', resetViewRotation], '-',
     ['境界線を隠す', 'Ctrl+H', () => { S.hideEdges = !S.hideEdges; drawOverlay(); }, () => S.hideEdges],
-    ['正面図・側面図', '', toggle3dViews, () => S.show3d],
+    ['正面図・側面図', '', toggle3dViews, () => S.show3d], ['平面図を組み立てた形で見る', '', togglePlanFolded, () => S.planFolded],
     ['定規', 'Ctrl+R', toggleRulers, () => S.rulers], ['スマートガイド', 'Ctrl+U', toggleSmart, () => S.smart], '-',
     ['ガイドを表示', 'Ctrl+:', toggleGuides, () => S.showGuides], ['ガイドをロック', 'Ctrl+Alt+:', toggleGuideLock, () => S.guidesLocked], ['ガイドを消去', '', clearGuides], '-',
     ['グリッドを表示', 'Ctrl+@', toggleGrid, () => S.grid], ['グリッドにスナップ', 'Ctrl+Shift+@', toggleSnapGrid, () => S.snapGrid],
@@ -111,6 +111,8 @@ function updateUI() {
   fd.disabled = !fs.movable.length;
   if (document.activeElement !== fd) fd.value = degs.length && degs.every((d) => d === degs[0]) ? r2(degs[0]) : '';
   $('btnFold90').disabled = $('btnFold0').disabled = !fs.movable.length;
+  $('btnPlanFolded').textContent = S.planFolded ? '平面図：組み立て' : '平面図：展開図';
+  $('btnPlanFolded').classList.toggle('on', !!S.planFolded);
   $('foldNote').textContent = fs.movable.length ? '' : fs.roots.length ? '土台の面です（動きません）' : fs.alone.length ? 'ほかの面と辺がつながっていません' : '辺をぴったり重ねた面を選ぶと折れます';
   const flags = [];
   if (S.smart) flags.push('スマートガイド');
@@ -226,6 +228,7 @@ $('inFoldDeg').addEventListener('change', () => { const v = parseFloat($('inFold
 $('btnFold90').addEventListener('click', () => setFold(90));
 $('btnFold0').addEventListener('click', () => setFold(0));
 $('btnUnfoldAll').addEventListener('click', unfoldAll);
+$('btnPlanFolded').addEventListener('click', togglePlanFolded);
 $('btnUnextrude').addEventListener('click', removeExtrude);
 for (const [id, prop] of [['inBW', 'width'], ['inBH', 'height']]) {
   $(id).addEventListener('change', () => {

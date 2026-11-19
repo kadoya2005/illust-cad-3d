@@ -48,15 +48,33 @@ function pathEl(it) {
   if (S.outline) return `<path data-id="${it.id}" d="${d}" fill="none" fill-rule="${it.rule}" stroke="#000" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
   return `<path data-id="${it.id}" d="${d}" fill="${it.fill || 'none'}" fill-rule="${it.rule}" stroke="${it.stroke || 'none'}" stroke-width="${it.sw}" stroke-miterlimit="10"/>`;
 }
-function renderNodes(arr) {
+function renderNodes(arr, later) {
   let h = '';
-  for (const n of arr) { if (n.hidden) continue; h += isGroup(n) ? '<g>' + renderNodes(n.children) + '</g>' : pathEl(n); }
+  for (const n of arr) {
+    if (n.hidden) continue;
+    // 組み立てた形で見るとき、折った面はあとで高さの順に描く（高い面が上に重なる）
+    if (later && !isGroup(n) && n.fold && n.plane) { later.push(n); continue; }
+    h += isGroup(n) ? '<g>' + renderNodes(n.children, later) + '</g>' : pathEl(n);
+  }
   return h;
 }
+// 折った面を真上から見た形（塗りあり）
+function foldedPlanEl(it) {
+  const d = planProjD(it);
+  if (S.outline) return `<path d="${d}" fill="none" stroke="#000" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  return `<path d="${d}" fill="${it.fill || 'none'}" fill-rule="${it.rule}" stroke="${it.stroke || 'none'}" stroke-width="${it.sw}" stroke-linejoin="round" pointer-events="none"/>`;
+}
+const avgZ = (it) => { const ns = it.subs[0].nodes; return ns.reduce((s, n) => s + toWorld(it.plane, n).z, 0) / ns.length; };
 function renderArt() {
   if (typeof applyFolds === 'function') applyFolds();   // 折りたたみの面の 3D の位置を、角度から決め直す
   let h = '';
-  for (const L of doc.layers) if (L.visible) h += '<g>' + renderNodes(L.items) + '</g>';
+  for (const L of doc.layers) {
+    if (!L.visible) continue;
+    const later = S.planFolded ? [] : null;
+    h += '<g>' + renderNodes(L.items, later);
+    if (later) h += later.sort((a, b) => avgZ(a) - avgZ(b)).map(foldedPlanEl).join('');
+    h += '</g>';
+  }
   art.innerHTML = h;
   S.snapCache = null;
   renderViews();   // 正面図・側面図も描き直す
