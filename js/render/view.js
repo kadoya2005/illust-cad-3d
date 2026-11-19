@@ -14,7 +14,7 @@ const toScr = (p) => {
 };
 // 回転・拡大を変えたあと、文書の点 d が画面の sp に来るように平行移動を決める
 function placeDocAt(d, sp) { view.x = 0; view.y = 0; const q = toScr(d); view.x = sp.x - q.x; view.y = sp.y - q.y; }
-const tol = () => 5 / view.z;
+const tol = () => 5 / inputScale();   // 5px（操作している図の倍率で）
 function stageCenter() { const r = stage.getBoundingClientRect(); return P(r.width / 2, r.height / 2); }
 
 function zoomAt(sp, nz) {
@@ -41,6 +41,8 @@ function fitView() {
 }
 
 function pathEl(it) {
+  // 床に平行でないパス（正面図・側面図に描いたもの）は、真上から見た線を薄く出すだけ（平面図では選べない）
+  if (!onTop(it)) return `<path d="${planProjD(it)}" fill="none" stroke="${it.stroke || it.fill || '#888'}" stroke-opacity="0.45" stroke-width="1" stroke-dasharray="3 2" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   const d = Geo.itemD(it);
   if (S.outline) return `<path data-id="${it.id}" d="${d}" fill="none" fill-rule="${it.rule}" stroke="#000" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
   return `<path data-id="${it.id}" d="${d}" fill="${it.fill || 'none'}" fill-rule="${it.rule}" stroke="${it.stroke || 'none'}" stroke-width="${it.sw}" stroke-miterlimit="10"/>`;
@@ -187,7 +189,7 @@ function docRectPts(bb, pad) {
 }
 function drawOverlay() {
   // 選択が変わったら、正面図・側面図の枠と色も描き直す
-  if (typeof V3 !== 'undefined' && V3.ok) { const sig = [...S.sel.keys()].join(); if (sig !== V3.lastSel) { V3.lastSel = sig; renderViews(); } }
+  if (typeof V3 !== 'undefined' && V3.ok) { const sig = displayTool() + '|' + (S.drawing ? S.drawing.id : '') + '|' + [...S.sel].map(([id, set]) => id + ':' + [...set].join('.')).join(); if (sig !== V3.lastSel) { V3.lastSel = sig; renderViews(); } }
   const t = displayTool();
   const nodeTool = NODE_TOOLS.has(t);
   const sp = toScr;
@@ -215,7 +217,9 @@ function drawOverlay() {
       for (const it of list) if (!S.sel.has(it.id)) h += `<path d="${Geo.itemD(it, sp)}" fill="none" stroke="${f.layer.color}" stroke-width="1.5"/>`;
     }
   }
-  const items = selectedItems();
+  // 平面図で扱うのは床に平行なパスだけ。ほかの平面のものは、真上から見た線を選択の色で出す
+  const allSel = selectedItems(), items = allSel.filter(onTop);
+  for (const it of S.hideEdges ? [] : allSel) if (!onTop(it)) h += `<path d="${planProjD(it, sp)}" fill="none" stroke="${findItem(it.id).layer.color}" stroke-width="1"/>`;
   for (const it of S.hideEdges ? [] : items) {
     const col = findItem(it.id).layer.color;
     const set = S.sel.get(it.id);

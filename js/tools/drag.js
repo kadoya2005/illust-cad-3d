@@ -28,7 +28,7 @@ function dragMove(e, p) {
   const d = S.drag;
   const q = e.shiftKey ? constrain45(d.start, p) : p;
   let dx = q.x - d.start.x, dy = q.y - d.start.y;
-  if (!d.moved && Math.hypot(dx, dy) * view.z < 3) return;
+  if (!d.moved && Math.hypot(dx, dy) * inputScale() < 3) return;
   d.moved = true;
   S.snapViz = null;
   if (!e.shiftKey) {
@@ -55,7 +55,7 @@ function startMarquee(p, mode) { S.drag = { type: 'marquee', mode }; S.marquee =
 function endMarquee() {
   const { a, b } = S.marquee;
   const r = { x0: Math.min(a.x, b.x), y0: Math.min(a.y, b.y), x1: Math.max(a.x, b.x), y1: Math.max(a.y, b.y) };
-  if ((r.x1 - r.x0) * view.z < 2 && (r.y1 - r.y0) * view.z < 2) return;
+  if ((r.x1 - r.x0) * inputScale() < 2 && (r.y1 - r.y0) * inputScale() < 2) return;
   const inR = (q) => q.x >= r.x0 && q.x <= r.x1 && q.y >= r.y0 && q.y <= r.y1;
   for (const it of editableItemsTopDown()) {
     if (S.drag.mode === 'items') { if (Geo.samples(it).some(inR)) selectNode(topOf(it), true); continue; }
@@ -103,7 +103,7 @@ function startBBoxRotate(corner, p) {
 }
 function dragBBoxRotate(e, p) {
   const d = S.drag, c = d.c;
-  if (!d.moved && vdist(p, d.start) * view.z < 2) return;
+  if (!d.moved && vdist(p, d.start) * inputScale() < 2) return;
   d.moved = true;
   let a = Math.atan2(p.y - c.y, p.x - c.x) - Math.atan2(d.start.y - c.y, d.start.x - c.x);
   if (e.shiftKey) a = snapAngle(a, Math.PI / 4);
@@ -139,6 +139,7 @@ function dragHandle(e, p) {
   let q = p;
   S.snapViz = null;
   if (e.shiftKey) q = constrain45(o, p);
+  else if (S.input) q = p;
   else { const sn = snapPoint(p, d.cands); q = sn.p; S.snapViz = sn.viz; }
   d.moved = true;
   nd[d.which] = P(q.x, q.y);
@@ -162,7 +163,7 @@ function dragConvert(e, p) {
   const d = S.drag, f = findItem(d.id);
   if (!f) return;
   const nd = f.item.subs[d.s].nodes[d.i];
-  if (!d.moved && vdist(p, d.start) * view.z < 3) return;
+  if (!d.moved && vdist(p, d.start) * inputScale() < 3) return;
   d.moved = true;
   const q = e.shiftKey ? constrain45(nd, p) : p;
   nd.hout = P(q.x, q.y); nd.hin = P(2 * nd.x - q.x, 2 * nd.y - q.y); nd.smooth = true;
@@ -208,7 +209,7 @@ function dragReshape(e, p) {
   const sb = f.item.subs[d.s], L = sb.nodes.length;
   const a = sb.nodes[d.seg], b = sb.nodes[(d.seg + 1) % L];
   const dx = p.x - d.start.x, dy = p.y - d.start.y;
-  if (!d.moved && Math.hypot(dx, dy) * view.z < 3) return;
+  if (!d.moved && Math.hypot(dx, dy) * inputScale() < 3) return;
   d.moved = true;
   // 曲線上の点 B(t) を (dx,dy) 動かすための、2つの制御点の動かし方
   const t = Math.min(0.95, Math.max(0.05, d.t));
@@ -286,5 +287,6 @@ function penHint(p, alt, sp) {
 }
 function penSnap(p, e, from) {
   if (e.shiftKey && from) return constrain45(from, p);
+  if (S.input) return p;   // 正面図・側面図では、まだ吸着しない
   return snapPoint(p, cachedCands()).p;
 }

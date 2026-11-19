@@ -163,6 +163,7 @@ function shapeToItem(el, ctx) {
     hidden: cs.display === 'none',
     locked: el.getAttribute('data-locked') === 'true',
     ...parseX3d(el.getAttribute('data-icad-x3d')),
+    ...parsePlane(el.getAttribute('data-icad-plane')),
   };
 }
 
@@ -251,9 +252,15 @@ function parseX3d(v) {
   const a = (v || '').split(',').map(Number);
   return a.length === 2 && a.every(isFinite) && a[1] > 0 ? { x3d: { z0: a[0], h: a[1] } } : {};
 }
+// 作業平面（3D）は data-icad-plane="o.x,o.y,o.z,u.x,u.y,u.z,v.x,v.y,v.z" で残す
+function parsePlane(v) {
+  const a = (v || '').split(',').map(Number);
+  return a.length === 9 && a.every(isFinite) ? { plane: { o: a.slice(0, 3), u: a.slice(3, 6), v: a.slice(6, 9) } } : {};
+}
+const planeAttr = (n) => (n.plane ? ` data-icad-plane="${[...n.plane.o, ...n.plane.u, ...n.plane.v].map(fmt).join(',')}"` : '');
 function nodeToSVG(n, ind) {
   // data-icad-id：読み込み直しても ID が変わらないように（3D の断面が ID で参照するため）
-  const extra = ` data-icad-id="${svgEsc(n.id)}"` + (n.x3d ? ` data-icad-x3d="${fmt(n.x3d.z0)},${fmt(n.x3d.h)}"` : '') + (n.locked ? ' data-locked="true"' : '') + (n.hidden ? ' style="display:none"' : '');
+  const extra = ` data-icad-id="${svgEsc(n.id)}"` + (n.x3d ? ` data-icad-x3d="${fmt(n.x3d.z0)},${fmt(n.x3d.h)}"` : '') + planeAttr(n) + (n.locked ? ' data-locked="true"' : '') + (n.hidden ? ' style="display:none"' : '');
   if (n.type === 'group') {
     const name = n.name ? ` data-name="${svgEsc(n.name)}"` : '';
     return `${ind}<g${name}${extra}>\n` + n.children.map((c) => nodeToSVG(c, ind + '  ')).join('') + `${ind}</g>\n`;

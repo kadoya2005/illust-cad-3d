@@ -6,6 +6,7 @@
 function buildCands(skip) {
   const pts = [];
   for (const it of visibleLeaves()) {
+    if (!onTop(it)) continue;   // ほかの平面のパスには平面図で吸着しない
     if (skip && skip.items && skip.items.has(it.id)) continue;
     it.subs.forEach((sb, s) => sb.nodes.forEach((n, i) => {
       if (skip && skip.nodes && skip.nodes.has(it.id + '|' + key(s, i))) return;

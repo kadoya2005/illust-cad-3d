@@ -16,7 +16,7 @@ const V3 = {
   k: 1,
   pan: { viewFront: P(0, 0), viewSide: P(0, 0) },
   rot: { viewFront: { yaw: 0, pitch: 0 }, viewSide: { yaw: 90, pitch: 0 } },
-  ok: false, scene: null, views: {}, meshes: new Map(), flats: null, board: null, light: null,
+  ok: false, scene: null, views: {}, meshes: new Map(), flatCache: new Map(), flats: null, handleHits: {}, penPlane: {}, board: null, light: null,
 };
 function fitViews3d() {
   V3.k = 1;
@@ -78,19 +78,31 @@ function disposeMesh(m) {
   m.mesh.geometry.dispose(); m.mesh.material.dispose();
   m.edges.geometry.dispose(); m.edges.material.dispose();
 }
-// 押し出していないパス：床の上の線
-function flatLines(items) {
+// 押し出していないパス：その作業平面の上の線（plane がないものは床の上）
+// パスごとに覚えておき、形・置き場所・色が変わったときだけ作り直す
+function flatLine(it) {
+  const col = it.stroke || it.fill || '#999999';
+  const key = JSON.stringify(it.subs) + JSON.stringify(it.plane || null) + col;
+  let m = V3.flatCache.get(it.id);
+  if (m && m.key === key) return m;
+  if (m) { if (m.group.parent) m.group.parent.remove(m.group); disposeGroup(m.group); }
   const g = new THREE.Group();
-  for (const it of items) {
-    for (const sb of it.subs) {
-      if (sb.nodes.length < 2) continue;
-      const pts = polyFromSub(sb);
-      if (sb.closed) pts.push(pts[0]);
-      const geo = new THREE.BufferGeometry().setFromPoints(pts.map((p) => new THREE.Vector3(p.x, 0.05, p.y)));
-      g.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: new THREE.Color(it.stroke || it.fill || '#999999') })));
-    }
+  const lift = onTop(it) ? 0.05 : 0;   // 床の線は、アートボードの板に埋もれないよう少しだけ上に
+  for (const sb of it.subs) {
+    if (sb.nodes.length < 2) continue;
+    const pts = subWorldPts(it, sb).map((w) => toThree({ x: w.x, y: w.y, z: w.z + lift }));
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: new THREE.Color(col) })));
   }
-  return g;
+  g.userData.id = it.id;
+  m = { key, group: g };
+  V3.flatCache.set(it.id, m);
+  return m;
+}
+function syncFlatLines(items) {
+  if (!V3.flats) { V3.flats = new THREE.Group(); V3.scene.add(V3.flats); }
+  const live = new Set(items.map((it) => it.id));
+  for (const [id, m] of V3.flatCache) if (!live.has(id)) { if (m.group.parent) m.group.parent.remove(m.group); disposeGroup(m.group); V3.flatCache.delete(id); }
+  for (const it of items) { const m = flatLine(it); if (m.group.parent !== V3.flats) V3.flats.add(m.group); }
 }
 function disposeGroup(g) {
   if (!g) return;
@@ -123,9 +135,7 @@ function renderViews() {
     m.edges.material.color.set(sel ? 0x4f80ff : S.outline ? 0x111111 : 0x222222);
   }
   // 床の線とアートボード
-  if (V3.flats) { scene.remove(V3.flats); disposeGroup(V3.flats); }
-  V3.flats = flatLines(flats);
-  scene.add(V3.flats);
+  syncFlatLines(flats);
   if (!V3.board || V3.board.userData.w !== doc.width || V3.board.userData.h !== doc.height) {
     if (V3.board) { scene.remove(V3.board); disposeGroup(V3.board); }
     const b = new THREE.Group();
@@ -141,12 +151,10 @@ function renderViews() {
   }
 
   // 大きさ：アートボードと形が入るように（2枚とも同じ縮尺）
-  let zMax = X3D_DEFAULT_H, zMin = 0;
-  for (const it of solids) { zMax = Math.max(zMax, it.x3d.z0 + it.x3d.h); zMin = Math.min(zMin, it.x3d.z0); }
-  const all = visibleLeaves();
-  const bb = all.length ? Geo.bbox(all) : null;
-  const xr = [Math.min(0, bb ? bb.x : 0), Math.max(doc.width, bb ? bb.x + bb.w : 0)];
-  const yr = [Math.min(0, bb ? bb.y : 0), Math.max(doc.height, bb ? bb.y + bb.h : 0)];
+  const wr = worldRange(visibleLeaves());   // 3D の範囲（正面・側面に置いたパスも入れる）
+  const zMax = Math.max(X3D_DEFAULT_H, wr ? wr.z1 : 0), zMin = Math.min(0, wr ? wr.z0 : 0);
+  const xr = [Math.min(0, wr ? wr.x0 : 0), Math.max(doc.width, wr ? wr.x1 : 0)];
+  const yr = [Math.min(0, wr ? wr.y0 : 0), Math.max(doc.height, wr ? wr.y1 : 0)];
   let center = new THREE.Vector3((xr[0] + xr[1]) / 2, (zMin + zMax) / 2, (yr[0] + yr[1]) / 2);
   let scale = Infinity;
   for (const v of VIEWS) {
@@ -154,7 +162,8 @@ function renderViews() {
     const span = v.id === 'viewFront' ? xr[1] - xr[0] : yr[1] - yr[0];
     scale = Math.min(scale, (r.width - 48) / Math.max(1, span), (r.height - 56) / Math.max(1, zMax - zMin));
   }
-  // ドラッグ中は、縮尺と中心を始めたときのままにする（形が大きくなっても画面が縮まないように）
+  // ドラッグ中・ペンで描いている途中は、縮尺と中心を始めたときのままにする（描いた点が画面の上でずれないように）
+  if (V3.hold && V3.hold.pen && !S.drawing && !S.input) V3.hold = null;
   if (V3.hold) { scale = V3.hold.scale; center = V3.hold.center.clone(); }
   else V3.fit = { scale, center: center.clone() };
   if (!(scale > 0) || !isFinite(scale)) return;
@@ -242,11 +251,10 @@ function hitFlat(id, q) {
     if (extrudeOf(it)) continue;
     for (const sb of it.subs) {
       if (sb.nodes.length < 2) continue;
-      const pts = polyFromSub(sb).map((p) => {
-        const pr = new THREE.Vector3(p.x, 0, p.y).project(vw.camera);
+      const pts = subWorldPts(it, sb).map((w) => {
+        const pr = toThree(w).project(vw.camera);
         return P(((pr.x + 1) / 2) * r.width, ((1 - pr.y) / 2) * r.height);
       });
-      if (sb.closed) pts.push(pts[0]);
       for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i], b = pts[i + 1], ab = vsub(b, a), L2 = ab.x * ab.x + ab.y * ab.y;
         const t = L2 > 1e-9 ? Math.max(0, Math.min(1, ((q.x - a.x) * ab.x + (q.y - a.y) * ab.y) / L2)) : 0;
@@ -261,11 +269,11 @@ function hitFlat(id, q) {
 function selRange() {
   const items = selectedItems();
   if (!items.length) return null;
-  const bb = Geo.bbox(items);
-  if (!bb) return null;
-  let zMin = Infinity, zMax = -Infinity;
-  for (const it of items) { const x = extrudeOf(it); const a = x ? x.z0 : 0, b = x ? x.z0 + x.h : 0; zMin = Math.min(zMin, a); zMax = Math.max(zMax, b); }
-  return { items, bb, zMin, zMax };
+  const wr = worldRange(items);
+  if (!wr) return null;
+  const bb = { x: wr.x0, y: wr.y0, w: wr.x1 - wr.x0, h: wr.y1 - wr.y0 };
+  // planar：全部が床に平行なパス（いまの押し出しの編集ができるのはこのときだけ）
+  return { items, bb, zMin: wr.z0, zMax: wr.z1, planar: items.every(onTop) };
 }
 // その図の画面での、選んでいるものの枠（px）
 function viewBox(id) {
@@ -293,16 +301,112 @@ const VB_HANDLES = (b) => {
 // 枠と取っ手を描く（canvas の上の SVG）
 function drawViewBox(id) {
   const svg = V3.views[id].box.querySelector('.vover');
-  const b = viewBox(id);
-  if (!b || S.hideEdges) { svg.innerHTML = ''; return; }
+  const nodes = viewNodesSvg(id);
+  const b = !NODE_TOOLS.has(displayTool()) && !S.drawing ? viewBox(id) : null;   // ペンなどでは枠を出さない（イラレと同じ）
+  if (!b || S.hideEdges) { svg.innerHTML = nodes; return; }
   const col = findItem(b.items[0].id).layer.color;
-  let h = `<rect x="${b.x0}" y="${b.y0}" width="${Math.max(0, b.x1 - b.x0)}" height="${Math.max(0, b.y1 - b.y0)}" fill="none" stroke="${col}" stroke-width="1"/>`;
-  for (const [x, y] of Object.values(VB_HANDLES(b))) h += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="#fff" stroke="${col}" stroke-width="1"/>`;
+  let h = nodes + `<rect x="${b.x0}" y="${b.y0}" width="${Math.max(0, b.x1 - b.x0)}" height="${Math.max(0, b.y1 - b.y0)}" fill="none" stroke="${col}" stroke-width="1"/>`;
+  if (b.planar) for (const [x, y] of Object.values(VB_HANDLES(b))) h += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="#fff" stroke="${col}" stroke-width="1"/>`;
   svg.innerHTML = h;
 }
+// この図の向きの平面か（正面図なら正面の板、側面図なら側面の板。奥行きはどこでもよい）
+function planeFitsView(id, pl) {
+  if (!pl || id === 'viewPlan') return false;
+  const base = planeForView(id, 0);
+  return v3len(v3sub(pl.u, base.u)) < 1e-9 && v3len(v3sub(pl.v, base.v)) < 1e-9;
+}
+// 図の画面の点 → 作業平面の 2D の点
+function viewToLocal(id, q, pl) {
+  const vw = V3.views[id], r = vw.box.getBoundingClientRect();
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2((q.x / r.width) * 2 - 1, -(q.y / r.height) * 2 + 1), vw.camera);
+  return rayToLocal(pl, rc.ray) || P(0, 0);
+}
+// 作業平面の 2D の点 → 図の画面の点
+function localToView(id, pl, p) {
+  const vw = V3.views[id], r = vw.box.getBoundingClientRect();
+  const pr = toThree(toWorld(pl, p)).project(vw.camera);
+  return P(((pr.x + 1) / 2) * r.width, ((1 - pr.y) / 2) * r.height);
+}
+// 選んでいるパスのアンカーと方向線（その図の向きの平面にあるものだけ）。平面図の drawOverlay と同じ見え方
+function viewNodesSvg(id) {
+  const hits = (V3.handleHits[id] = []);
+  if (!editable(id) || S.hideEdges) return '';
+  const nodeTool = NODE_TOOLS.has(displayTool());
+  let h = '';
+  for (const it of selectedItems()) {
+    const pl = planeOf(it);
+    if (!planeFitsView(id, pl)) continue;
+    const col = findItem(it.id).layer.color, set = S.sel.get(it.id);
+    const sp = (p) => localToView(id, pl, p);
+    if (nodeTool) {
+      it.subs.forEach((sb, s) => {
+        const n = sb.nodes, L = n.length, show = new Set();
+        for (let i = 0; i < L; i++) {
+          if (!set.has(key(s, i))) continue;
+          show.add(i + '|hin'); show.add(i + '|hout');
+          if (i > 0 || sb.closed) show.add((i - 1 + L) % L + '|hout');
+          if (i < L - 1 || sb.closed) show.add((i + 1) % L + '|hin');
+        }
+        for (const k of show) {
+          const [is, w] = k.split('|');
+          const nd = n[+is], hp = nd && nd[w];
+          if (!hp) continue;
+          const a = sp(nd), b = sp(hp);
+          h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="1"/>`;
+          h += `<circle cx="${b.x}" cy="${b.y}" r="3.5" fill="${col}" stroke="#fff" stroke-width="1"/>`;
+          hits.push({ id: it.id, s, i: +is, which: w, x: b.x, y: b.y });
+        }
+      });
+    }
+    it.subs.forEach((sb, s) => sb.nodes.forEach((nd, i) => {
+      const a = sp(nd), on = !nodeTool || set.has(key(s, i));
+      h += `<rect x="${a.x - 3}" y="${a.y - 3}" width="6" height="6" fill="${on ? col : '#fff'}" stroke="${col}" stroke-width="1"/>`;
+    }));
+  }
+  return h;
+}
+
+// ---- 正面図・側面図のペン（ペンツールそのものは平面図と同じ。作業平面の 2D の座標を渡すだけ） ----
+// 描く平面：描いている途中のパス → 選んでいるパス → この図で前に使った平面 → アートボードの真ん中の奥行き
+function viewPenPlane(id) {
+  const f = S.drawing && findItem(S.drawing.id);
+  if (f && planeFitsView(id, f.item.plane)) return f.item.plane;
+  const sel = selectedItems().find((it) => planeFitsView(id, it.plane));
+  if (sel) return sel.plane;
+  if (V3.penPlane[id]) return V3.penPlane[id];
+  return planeForView(id, id === 'viewFront' ? doc.height / 2 : doc.width / 2);
+}
+function viewPenDown(id, e, q) {
+  const pl = viewPenPlane(id);
+  const f = S.drawing && findItem(S.drawing.id);
+  if (f && !sameFrame(planeOf(f.item), pl)) endDrawing();   // 別の平面で描いていたものは、そこで終える
+  S.input = { view: id, plane: pl, scale: V3.scale, handleHits: V3.handleHits[id] || [] };
+  V3.penPlane[id] = clone(pl);
+  if (!V3.hold && V3.fit) V3.hold = { ...V3.fit, pen: true };
+  S.keys.ctrl = e.ctrlKey || e.metaKey; S.keys.alt = e.altKey; S.keys.shift = e.shiftKey;
+  S.activeTool = 'pen'; S.selGuide = null; S.segSel = null; S.hover = null;
+  Tools.pen.down(e, viewToLocal(id, q, pl), q);
+  if (!S.drag) endViewPen(e, q);   // クリックだけで終わる操作（アンカーの削除・連結など）
+  else { drawOverlay(); updateUI(); }
+}
+function viewPenMove(e, q) {
+  if (!S.drag || !S.input) return;
+  S.keys.alt = e.altKey; S.keys.shift = e.shiftKey;
+  S.input.scale = V3.scale;
+  Tools.pen.move(e, viewToLocal(S.input.view, q, S.input.plane), q);
+  drawOverlay();
+}
+function endViewPen(e, q) {
+  if (S.drag && S.input) Tools.pen.up(e, viewToLocal(S.input.view, q, S.input.plane), q);
+  S.drag = null; S.activeTool = null; S.snapViz = null; S.input = null;
+  afterSelect(); drawOverlay(); updateUI(); updateCursor();
+  renderViews();
+}
+
 function hitViewHandle(id, q) {
   const b = viewBox(id);
-  if (!b) return null;
+  if (!b || !b.planar) return null;
   let best = null, bd = 6;
   for (const [k, [x, y]] of Object.entries(VB_HANDLES(b))) { const d = Math.hypot(x - q.x, y - q.y); if (d < bd) { bd = d; best = k; } }
   return best;
@@ -325,7 +429,7 @@ function snapZ(d, edges, dz, e) {
 }
 function startViewXf(id, kind, handle, q) {
   const sr = selRange();
-  if (!sr) return null;
+  if (!sr || !sr.planar) return null;   // 正面・側面に置いたパスの移動は、まだ（選ぶだけ）
   if (V3.fit) V3.hold = V3.fit;   // ドラッグが終わるまで画面の縮尺を変えない
   return {
     type: 'vxf', kind, handle, view: id, s: q, sr, moved: false,
@@ -449,6 +553,14 @@ for (const v of VIEWS) {
       return;
     }
     if (e.button !== 0) return;
+    // ペン：その図の向きの板の上に描く（回して見ているときは描けない）
+    if (effectiveTool(e) === 'pen') {
+      if (!editable(v.id)) { toast('回して見ている図では描けません（ダブルクリックで戻す）'); return; }
+      grab(); drag = { type: 'pen' };
+      viewPenDown(v.id, e, q);
+      if (!S.drag) drag = null;
+      return;
+    }
     if (S.drawing) endDrawing();
     // 取っ手：伸び縮み
     const hd = !e.shiftKey && hitViewHandle(v.id, q);
@@ -474,6 +586,7 @@ for (const v of VIEWS) {
   el.addEventListener('pointermove', (e) => {
     const q = local(e);
     if (!drag) { hoverView(v.id, q); return; }
+    if (drag.type === 'pen') { viewPenMove(e, q); return; }
     if (drag.type === 'vxf') { moveViewXf(drag, q, e); showTip(v.id, q, drag.moved ? drag.tip : ''); return; }
     if (drag.type === 'pan') V3.pan[v.id] = P(drag.o.x + q.x - drag.s.x, drag.o.y + q.y - drag.s.y);
     else {
@@ -486,8 +599,9 @@ for (const v of VIEWS) {
     }
     renderViews();
   });
-  const end = () => {
+  const end = (e) => {
     if (!drag) return;
+    if (drag.type === 'pen') endViewPen(e, local(e));
     if (drag.type === 'vxf') { endViewXf(drag); showTip(v.id, null, ''); }
     drag = null; updateCursor();
   };
@@ -517,7 +631,7 @@ function updateViewsCursor() {
     el.style.cursor = zoom ? (S.keys.alt ? 'zoom-out' : 'zoom-in')
       : S.spaceDown ? (S.keys.shift ? ROTATE_CURSORS.ne : 'grab')
       : S.tool === 'hand' ? 'grab'
-      : HANDLE_CURSORS[hv] || SELECT_CURSOR;
+      : HANDLE_CURSORS[hv] || (S.tool === 'pen' && !S.keys.ctrl ? 'crosshair' : SELECT_CURSOR);
   }
 }
 function hoverView(id, q) {

@@ -5,6 +5,7 @@
 stage.addEventListener('pointerdown', (e) => {
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   closeMenus();
+  S.input = null;
   const sp = evScr(e), p = toDoc(sp);
   S.mouse = p; S.mouseScr = sp;
   S.keys.ctrl = e.ctrlKey || e.metaKey; S.keys.alt = e.altKey; S.keys.shift = e.shiftKey;
@@ -15,11 +16,14 @@ stage.addEventListener('pointerdown', (e) => {
   S.activeTool = t;
   S.selGuide = null; S.segSel = null;
   if (S.drawing && t !== 'pen' && t !== 'hand' && t !== 'zoom') endDrawing();
+  else if (S.drawing && t === 'pen') { const f = findItem(S.drawing.id); if (f && !onTop(f.item)) endDrawing(); }   // 正面図・側面図で描いていたパスは、平面図では続けない
   S.hover = null;
   Tools[t].down(e, p, sp);
   drawOverlay(); updateCursor();
 });
 stage.addEventListener('pointermove', (e) => {
+  if (S.input && S.drag) return;   // 正面図・側面図でドラッグ中
+  S.input = null;
   const sp = evScr(e), p = toDoc(sp);
   S.mouse = p; S.mouseScr = sp;
   S.keys.ctrl = e.ctrlKey || e.metaKey; S.keys.alt = e.altKey; S.keys.shift = e.shiftKey;

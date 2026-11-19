@@ -6,7 +6,7 @@
 
 const X3D_DEFAULT_H = 72;   // 押し出すときの最初の高さ（72pt ＝ 1 インチ ＝ 25.4mm）
 
-const extrudeOf = (it) => (it && !isGroup(it) && it.x3d && it.x3d.h > 0 ? it.x3d : null);
+const extrudeOf = (it) => (it && !isGroup(it) && it.x3d && it.x3d.h > 0 && onTop(it) ? it.x3d : null);   // 押し出しは、いまは床に平行なパスだけ
 // 選んでいるパス（グループの中も）のうち、閉じたサブパスがあるもの
 function selectedProfileLeaves() {
   return leaves(selectedTops().map((t) => t.node)).filter((it) => it.subs.some((sb) => sb.closed && sb.nodes.length >= 2));

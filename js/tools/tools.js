@@ -164,6 +164,7 @@ const Tools = {
       }
       if (e.altKey) { const hh = hitHandle(sp); if (hh) { startHandleDrag(hh, true); return; } }
       for (const it of selectedItems()) {
+        if (!inInputPlane(it)) continue;   // 違う平面のパスにはアンカーを足さない
         const nr = Geo.nearest(it, p);
         if (nr && nr.seg >= 0 && nr.d <= tol()) { const k = insertNode(it, nr.s, nr.seg, nr.t); S.sel.clear(); S.sel.set(it.id, new Set([k])); render(); commit(); return; }
       }
@@ -171,6 +172,7 @@ const Tools = {
       if (!layerWritable(L)) { toast('ロック中または非表示のレイヤーには描けません'); return; }
       const q = penSnap(p, e, null);
       const it = newItem([{ nodes: [mkNode(q.x, q.y)], closed: false }], false);
+      if (S.input) it.plane = clone(S.input.plane);   // 正面図・側面図で描いたパスは、その平面に置く
       L.items.push(it);
       S.drawing = { id: it.id, s: 0 };
       selectDrawingLast();
@@ -185,7 +187,7 @@ const Tools = {
       if (!f) return;
       const sb = f.item.subs[d.s];
       const nd = d.type === 'penClose' ? sb.nodes[0] : sb.nodes[d.i];
-      if (!d.moved && vdist(p, d.start) * view.z < 3 && !S.spaceDown) return;
+      if (!d.moved && vdist(p, d.start) * inputScale() < 3 && !S.spaceDown) return;
       d.moved = true;
       S.snapViz = null;
       // ドラッグ中に Space：アンカーごと動かす（イラレと同じ）

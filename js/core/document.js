@@ -19,7 +19,7 @@ function isEditable(f) { return layerWritable(f.layer) && !f.item.hidden && !f.i
 // 上にあるものから順に、編集できるパス
 function editableItemsTopDown() {
   const out = [];
-  const walk = (arr) => { for (let i = arr.length - 1; i >= 0; i--) { const n = arr[i]; if (n.hidden || n.locked) continue; if (isGroup(n)) walk(n.children); else out.push(n); } };
+  const walk = (arr) => { for (let i = arr.length - 1; i >= 0; i--) { const n = arr[i]; if (n.hidden || n.locked) continue; if (isGroup(n)) walk(n.children); else if (inInputPlane(n)) out.push(n); } };   // 操作している平面の上のパスだけ（平面図では床に平行なもの）
   for (let li = doc.layers.length - 1; li >= 0; li--) if (layerWritable(doc.layers[li])) walk(doc.layers[li].items);
   return out;
 }

@@ -27,7 +27,7 @@ function hitItem(p) {
 // 方向線の先（ハンドル）。いちばん近いものを、少し広めの範囲（8px）で拾う
 function hitHandle(sp) {
   let best = null, bd = 8;
-  for (const h of S.handleHits) { const d = Math.hypot(h.x - sp.x, h.y - sp.y); if (d <= bd) { bd = d; best = h; } }
+  for (const h of S.input ? S.input.handleHits : S.handleHits) { const d = Math.hypot(h.x - sp.x, h.y - sp.y); if (d <= bd) { bd = d; best = h; } }
   return best;
 }
 // バウンディングボックスの取っ手（いちばん近いもの。小さい図形で隣の取っ手を拾わないように）
