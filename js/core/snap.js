@@ -20,10 +20,27 @@ function buildCands(skip) {
   pts.push({ x: W / 2, y: Ht / 2, kind: '中心' });
   return pts;
 }
+// 吸着先の辺：見えているパスのまっすぐな辺（skip の中のものは除く）
+function buildSnapSegs(skip) {
+  const out = [];
+  for (const it of visibleLeaves()) {
+    if (!onTop(it) || (skip && skip.items && skip.items.has(it.id))) continue;
+    for (const sb of it.subs) {
+      const n = sb.nodes, L = n.length;
+      for (let i = 0; i < (sb.closed ? L : L - 1); i++) {
+        const a = n[i], b = n[(i + 1) % L];
+        if (a.hout || b.hin || vdist(a, b) < 1e-6) continue;
+        out.push({ a: P(a.x, a.y), b: P(b.x, b.y) });
+        if (out.length > 3000) return out;
+      }
+    }
+  }
+  return out;
+}
 function cachedCands() { if (!S.snapCache) S.snapCache = buildCands(); return S.snapCache; }
 // refs（動かしている点の仮の位置）をどれだけずらせば吸着するか
-function snapRefs(refs, cands) {
-  const T = 5 / view.z;
+function snapRefs(refs, cands, opt) {
+  const T = ((opt && opt.px) || 5) / view.z;
   const viz = { lines: [], label: '', at: null };
   if (!refs.length) return { dx: 0, dy: 0, viz };
   if (S.snapGrid) {
@@ -46,6 +63,17 @@ function snapRefs(refs, cands) {
     }
   }
   if (pt) { viz.label = pt.c.kind; viz.at = P(pt.c.x, pt.c.y); return { dx: pt.dx, dy: pt.dy, viz }; }
+  // アンカーを、ほかのパスの辺の上へ（面と面の辺をぴったり接触させる）
+  if (S.smart && opt && opt.segs) {
+    let best = null;
+    for (const r of refs) for (const s of opt.segs) {
+      const ab = vsub(s.b, s.a), L2 = ab.x * ab.x + ab.y * ab.y;
+      const t = Math.max(0, Math.min(1, ((r.x - s.a.x) * ab.x + (r.y - s.a.y) * ab.y) / L2));
+      const q = vadd(s.a, vmul(ab, t)), d = vdist(q, r);
+      if (d <= T && (!best || d < best.d)) best = { d, dx: q.x - r.x, dy: q.y - r.y, q };
+    }
+    if (best) { viz.label = 'パス'; viz.at = best.q; return { dx: best.dx, dy: best.dy, viz }; }
+  }
   const dx = bx ? bx.dx : 0, dy = by ? by.dy : 0;
   if (bx && bx.c) viz.lines.push([P(bx.c.x, bx.c.y), P(bx.r.x + dx, bx.r.y + dy)]);
   if (by && by.c) viz.lines.push([P(by.c.x, by.c.y), P(by.r.x + dx, by.r.y + dy)]);

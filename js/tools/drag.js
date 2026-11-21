@@ -3,7 +3,9 @@
 
 // ================= ツール =================
 function startMove(p, e, nodesOnly) {
-  const d = { type: 'move', start: p, nodesOnly, alt: e.altKey && !nodesOnly, dup: false, moved: false, dx: 0, dy: 0, orig: snapshotSel() };
+  // base・baseSel：動かし始めたときの元のもの（ドラッグ中に Alt を離してコピーをやめたら、ここに戻す）
+  const d = { type: 'move', start: p, nodesOnly, dup: false, moved: false, dx: 0, dy: 0, orig: snapshotSel() };
+  d.base = d.orig; d.baseSel = new Map([...S.sel].map(([k, v]) => [k, new Set(v)]));
   // 吸着に使う点：動かすアンカー、または選択範囲の角・辺の中点・中心
   const refs = [];
   const skip = { items: new Set(), nodes: new Set() };
@@ -19,9 +21,12 @@ function startMove(p, e, nodesOnly) {
     if (bb) for (const fx of [0, 0.5, 1]) for (const fy of [0, 0.5, 1]) refs.push(P(bb.x + bb.w * fx, bb.y + bb.h * fy));
     const ha = hitAnchor(p);
     if (ha && S.sel.has(ha.it.id)) refs.unshift(P(ha.it.subs[ha.s].nodes[ha.i].x, ha.it.subs[ha.s].nodes[ha.i].y));
+    // 動かすパスのアンカー全部も吸着に使う（面と面の辺をぴったり合わせるため）
+    for (const it of items) for (const sb of it.subs) for (const n of sb.nodes) if (refs.length < 300) refs.push(P(n.x, n.y));
   }
   d.refs = refs;
   d.cands = buildCands(skip);
+  d.segs = buildSnapSegs(skip);   // ほかのパスのまっすぐな辺（アンカーを辺の上に吸着させる）
   S.drag = d;
 }
 function dragMove(e, p) {
@@ -32,10 +37,18 @@ function dragMove(e, p) {
   d.moved = true;
   S.snapViz = null;
   if (!e.shiftKey) {
-    const sn = snapRefs(d.refs.map((r) => P(r.x + dx, r.y + dy)), d.cands);
+    // 移動は吸着を強めに（8px）。アンカーどうし → アンカーを辺の上へ → 縦横の位置合わせ、の順
+    const sn = snapRefs(d.refs.map((r) => P(r.x + dx, r.y + dy)), d.cands, { segs: d.segs, px: 8 });
     dx += sn.dx; dy += sn.dy; S.snapViz = sn.viz;
   }
-  if (d.alt && !d.dup) { restoreFrom(d.orig); duplicateSelection(); d.dup = true; d.orig = snapshotSel(); }
+  // Alt：ドラッグの途中で押してもコピーになり、離すと移動に戻る（イラレと同じ。離した瞬間の状態で決まる）
+  const wantCopy = !!e.altKey && !d.nodesOnly;
+  if (wantCopy && !d.dup) { restoreFrom(d.base); duplicateSelection(); d.dup = true; d.orig = snapshotSel(); }
+  else if (!wantCopy && d.dup) {
+    for (const id of d.orig.keys()) removeItem(id);
+    S.sel = new Map([...d.baseSel].map(([k, v]) => [k, new Set(v)]));
+    d.dup = false; d.orig = d.base;
+  }
   for (const [id, subs] of d.orig) {
     const f = findItem(id);
     if (!f) continue;
@@ -43,8 +56,15 @@ function dragMove(e, p) {
     const set = S.sel.get(id);
     f.item.subs.forEach((sb, s) => sb.nodes.forEach((n, i) => { if (d.nodesOnly && !(set && set.has(key(s, i)))) return; moveNode(n, dx, dy); }));
   }
-  d.dx = dx; d.dy = dy;
+  d.dx = dx; d.dy = dy; d.lastP = p;
   renderArt();
+}
+// Alt を押した・離したときに、マウスを動かさなくてもすぐ切り替える
+function refreshMoveDrag(e) {
+  const d = S.drag;
+  if (!d || d.type !== 'move' || !d.moved || !d.lastP) return;
+  dragMove({ altKey: e.altKey, shiftKey: e.shiftKey }, d.lastP);
+  drawOverlay();
 }
 function endMove() {
   const d = S.drag;

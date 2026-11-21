@@ -10,6 +10,7 @@ function isTyping() {
 }
 function refreshMods(e) {
   if (e) { S.keys.ctrl = e.ctrlKey || e.metaKey; S.keys.alt = e.altKey; S.keys.shift = e.shiftKey; }
+  if (e && S.drag && S.drag.type === 'move') refreshMoveDrag(e);   // ドラッグ中の Alt：コピー ⇔ 移動
   updateCursor();
   if (!S.drag) {
     // Alt を押した・離したときに、カーソルの横の印とステータスバーをすぐ切り替える

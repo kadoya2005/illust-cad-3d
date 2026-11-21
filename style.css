@@ -52,6 +52,7 @@ input[type=color].none { opacity: .35; }
 }
 .brand { font-weight: 700; white-space: nowrap; }
 .brand .ver { font-weight: 400; color: var(--muted); margin-left: 4px; }
+.brand .vnum { font-size: 10px; opacity: .8; }
 .menu { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
 .menu button { white-space: nowrap; flex-shrink: 0; }
 .menu .sep { width: 1px; height: 18px; background: #555; margin: 0 4px; }

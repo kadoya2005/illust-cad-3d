@@ -14,6 +14,9 @@ onDocChange((kind) => {
 });
 
 function init() {
+  // 版の番号：読み込んだ app.js の ?v= から（ページに上げるたびに上げている番号）
+  const vm = (document.querySelector('script[src*="app.js"]') || {}).src?.match(/[?&]v=(\d+)/);
+  if (vm) $('appVer').textContent = 'ver ' + vm[1];
   loadPrefs();
   const saved = loadAutosave();
   if (saved) { doc = saved.doc; if (saved.name) S.fileName = saved.name; }
