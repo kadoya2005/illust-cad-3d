@@ -5,6 +5,11 @@ Illustrator と同じショートカットで使える、ベジェ曲線のお�
 
 Adobe Illustrator とは関係のない、非公式のツールです。
 
+**すぐ試す：https://kadoya2005.github.io/illust-cad-3d/** （ブラウザで開くだけ。インストール不要）
+
+- 画面左上のタイトルの横に「ver ○○」が出ます。古い番号のままなら Ctrl+F5 で読み込み直してください
+- 折りたたみのお試し用：[samples/立方体の展開図.svg](samples/立方体の展開図.svg) を保存して「開く」で読み込む
+
 ## 使い方
 
 `index.html` を Chrome か Edge で開くだけで動きます（インストール不要）。
