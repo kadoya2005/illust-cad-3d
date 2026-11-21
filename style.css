@@ -113,6 +113,7 @@ button.small { padding: 1px 6px; font-size: 11px; }
 #layerList li.active { background: #3d4f75; }
 #layerList li .chip { width: 4px; align-self: stretch; }
 #layerList li .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#layerList li .nmEdit { flex: 1; min-width: 0; font: inherit; padding: 0 3px; }
 #layerList li .ib { width: 20px; height: 18px; padding: 0; background: none; border: none; color: var(--muted); }
 #layerList li .ib.off { opacity: .25; }
 #layerList li .ib svg { width: 14px; height: 14px; display: block; margin: auto; }

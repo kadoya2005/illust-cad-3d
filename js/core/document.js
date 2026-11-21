@@ -64,6 +64,7 @@ function scaleNodeUnits(n, k) {
   if (isFinite(n.sw)) n.sw *= k;
   if (n.x3d) n.x3d = { ...n.x3d, z0: n.x3d.z0 * k, h: n.x3d.h * k };
   if (n.plane) n.plane = { ...n.plane, o: n.plane.o.map((v) => v * k) };
+  if (n.fold && n.fold.base) n.fold = { ...n.fold, base: { ...n.fold.base, o: n.fold.base.o.map((v) => v * k) } };
   return n;
 }
 function normalizeLeaf(it) {

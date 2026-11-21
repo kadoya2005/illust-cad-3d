@@ -48,6 +48,11 @@ function pathEl(it) {
   if (S.outline) return `<path data-id="${it.id}" d="${d}" fill="none" fill-rule="${it.rule}" stroke="#000" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
   return `<path data-id="${it.id}" d="${d}" fill="${it.fill || 'none'}" fill-rule="${it.rule}" stroke="${it.stroke || 'none'}" stroke-width="${it.sw}" stroke-miterlimit="10"/>`;
 }
+// 平面図での折り線の両端（文書の座標）
+function planHingePts(h) {
+  if (S.planFolded) return hingeWorld(h).map((w) => P(w.x, w.y));
+  return [h.e.a, h.e.b];
+}
 function renderNodes(arr, later) {
   let h = '';
   for (const n of arr) {
@@ -209,7 +214,7 @@ function docRectPts(bb, pad) {
 }
 function drawOverlay() {
   // 選択が変わったら、正面図・側面図の枠と色も描き直す
-  if (typeof V3 !== 'undefined' && V3.ok) { const sig = displayTool() + '|' + (S.drawing ? S.drawing.id : '') + '|' + [...S.sel].map(([id, set]) => id + ':' + [...set].join('.')).join(); if (sig !== V3.lastSel) { V3.lastSel = sig; renderViews(); } }
+  if (typeof V3 !== 'undefined' && V3.ok) { const sig = displayTool() + '|' + (S.foldHinge || '') + '|' + (S.drawing ? S.drawing.id : '') + '|' + [...S.sel].map(([id, set]) => id + ':' + [...set].join('.')).join(); if (sig !== V3.lastSel) { V3.lastSel = sig; renderViews(); } }
   const t = displayTool();
   const nodeTool = NODE_TOOLS.has(t);
   const sp = toScr;
@@ -293,6 +298,9 @@ function drawOverlay() {
       }
     }
   }
+  // 折り線（オレンジ）：展開図ならその辺、組み立てた形なら真上から見た線
+  const oh = typeof findHinge === 'function' && S.foldHinge && findHinge(S.foldHinge);
+  if (oh) { const [a, b] = planHingePts(oh).map(sp); h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ff8c1a" stroke-width="3" stroke-linecap="round"/>`; }
   // 整列のキーオブジェクト（太い枠）
   if (S.keyId && !S.hideEdges) {
     const f = findItem(S.keyId);

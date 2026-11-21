@@ -147,8 +147,8 @@ function renderViews() {
     if (m.group.parent !== scene) scene.add(m.group);
     const sel = selIds.has(it.id);
     m.mesh.visible = !S.outline;
-    m.mesh.material.color.set(it.fill || '#d9d9d9');
-    m.mesh.material.emissive.set(sel ? 0x0b1733 : 0x000000);
+    m.mesh.material.color.set(it.fill || it.stroke || '#d9d9d9');   // 塗りがなければ線の色
+    m.mesh.material.emissive.set(0x000000);   // 選んでいても色は変えない（選択は輪郭の青で分かる）
     m.edges.material.color.set(sel ? 0x4f80ff : S.outline ? 0x111111 : 0x222222);
   }
   // 床の線とアートボード
@@ -317,9 +317,36 @@ const VB_HANDLES = (b) => {
   return hs;
 };
 // 枠と取っ手を描く（canvas の上の SVG）
+// 折り線（オレンジ）と、つかむ線（緑。ドラッグ中は青）
+function viewFoldSvg(id) {
+  let h = '';
+  const sc = (w) => localToViewW(id, w);
+  const oh = S.foldHinge && findHinge(S.foldHinge);
+  if (oh) { const [a, b] = hingeWorld(oh).map(sc); h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ff8c1a" stroke-width="3" stroke-linecap="round"/>`; }
+  const g = V3.grabLine, f = g && findItem(g.face);
+  // 動く側の面を薄く色づけ（ドラッグ前に、どこが動くか分かるように）
+  if (oh && f) {
+    const side = foldSide(oh, f.item);
+    if (side) for (const id of side) {
+      const ff = findItem(id); if (!ff) continue;
+      const it2 = ff.item, pl2 = planeOf(it2);
+      const pts2 = polyFromSub(it2.subs[0]).map((p) => sc(toWorld(pl2, p)));
+      h += `<polygon points="${pts2.map((p) => p.x + ',' + p.y).join(' ')}" fill="${g.active ? '#2f7bff' : '#2fbf4f'}" fill-opacity="0.18" stroke="none"/>`;
+    }
+  }
+  if (oh && f) {
+    const it = f.item, n = it.subs[0].nodes, a = n[g.seg], b = n[(g.seg + 1) % n.length], pl = planeOf(it);
+    if (a && b) {
+      const pts = [];
+      for (let k = 0; k <= 12; k++) pts.push(sc(toWorld(pl, cubicAt(a, a.hout || a, b.hin || b, b, k / 12))));
+      h += `<polyline points="${pts.map((p) => p.x + ',' + p.y).join(' ')}" fill="none" stroke="${g.active ? '#2f7bff' : '#2fbf4f'}" stroke-width="3" stroke-linecap="round"/>`;
+    }
+  }
+  return h;
+}
 function drawViewBox(id) {
   const svg = V3.views[id].box.querySelector('.vover');
-  const nodes = viewNodesSvg(id);
+  const nodes = viewNodesSvg(id) + viewFoldSvg(id);
   const b = !NODE_TOOLS.has(displayTool()) && !S.drawing ? viewBox(id) : null;   // ペンなどでは枠を出さない（イラレと同じ）
   if (!b || S.hideEdges) { svg.innerHTML = nodes; return; }
   const col = findItem(b.items[0].id).layer.color;
@@ -589,20 +616,35 @@ for (const v of VIEWS) {
     // 取っ手：伸び縮み
     const hd = !e.shiftKey && hitViewHandle(v.id, q);
     if (hd) { grab(); drag = startViewXf(v.id, 'scale', hd, q); return; }
+    // 折りたたみ：オレンジの折り線があるときは、ほかの線（緑）をつかんで折る
+    const toScr3 = (w) => localToViewW(v.id, w);
+    const oh = S.foldHinge && findHinge(S.foldHinge);
+    if (oh && !e.shiftKey) {
+      const gl = hitGrabLine(oh, toScr3, q);
+      if (gl) {
+        const d = startHingeDrag(oh, gl.face);
+        if (!d) { toast('面のつながりが輪になっているので、この線では折れません'); return; }
+        applyFolds();
+        grab();
+        if (V3.fit) V3.hold = V3.fit;
+        drag = { type: 'fold', d, grab2: gl.mid, gl, s: q, moved: false };
+        V3.grabLine = { face: gl.face.id, seg: gl.seg, active: true };
+        renderViews();
+        return;
+      }
+    }
+    // 折り線をクリック → オレンジ（もう一度クリックで外す）
+    const hh = !e.shiftKey && hitHinge(toScr3, q);
+    if (hh) {
+      const k = hingeKey(hh.A, hh.B);
+      S.foldHinge = S.foldHinge === k ? null : k;
+      V3.grabLine = null;
+      render(); updateUI();
+      return;
+    }
     // 立体・線をクリック
     const id = hitView(v.id, q.x, q.y) || hitFlat(v.id, q);
     const f = id && findItem(id);
-    // 折れる面：ドラッグで起こす（マウスについてくる）。回して見ている図でもできる
-    if (f && !e.shiftKey && FOLD_INFO.has(f.item.id)) {
-      if (!S.sel.has(f.item.id)) { S.sel.clear(); selItem(f.item, false); }
-      afterSelect(); render(); updateUI();
-      const faces = selectedFoldFaces().movable;
-      if (!faces.includes(f.item)) faces.push(f.item);
-      grab();
-      if (V3.fit) V3.hold = V3.fit;
-      drag = { type: 'fold', view: v.id, it: f.item, faces, s: q, deg0: (f.item.fold && f.item.fold.deg) || 0, moved: false };
-      return;
-    }
     if (f) {
       const target = topOf(f.item);
       const ls = leaves([target]);
@@ -615,7 +657,7 @@ for (const v of VIEWS) {
     }
     // 枠の中（何もないところでも）：移動
     if (!e.shiftKey && insideViewBox(v.id, q)) { grab(); drag = startViewXf(v.id, 'move', null, q); return; }
-    if (!e.shiftKey) S.sel.clear();
+    if (!e.shiftKey) { S.sel.clear(); S.foldHinge = null; }
     afterSelect(); render(); updateUI();
   });
   el.addEventListener('pointermove', (e) => {
@@ -625,9 +667,9 @@ for (const v of VIEWS) {
     if (drag.type === 'fold') {
       if (!drag.moved && Math.hypot(q.x - drag.s.x, q.y - drag.s.y) < 3) return;
       drag.moved = true;
-      const raw = foldAngleToward(drag.it, (w) => localToViewW(v.id, w), q, (drag.it.fold && drag.it.fold.deg) || 0);
+      const raw = hingeAngleToward(drag.d, drag.grab2, (w) => localToViewW(v.id, w), q);
       const deg = snapFoldDeg(raw, e.shiftKey);
-      for (const it of drag.faces) it.fold = { ...(it.fold || {}), deg };   // 選んでいる面は同じ角度に
+      setHingeDeg(drag.d.h.A, drag.d.h.B, deg);
       render(); updateUI();
       showTip(v.id, q, `角度 ${r2(deg)}°`);
       return;
@@ -647,7 +689,7 @@ for (const v of VIEWS) {
   const end = (e) => {
     if (!drag) return;
     if (drag.type === 'pen') endViewPen(e, local(e));
-    if (drag.type === 'fold') { V3.hold = null; showTip(v.id, null, ''); if (drag.moved) commit(); renderViews(); }
+    if (drag.type === 'fold') { V3.hold = null; V3.grabLine = null; showTip(v.id, null, ''); render(); commit(); }
     if (drag.type === 'vxf') { endViewXf(drag); showTip(v.id, null, ''); }
     drag = null; updateCursor();
   };
@@ -677,12 +719,18 @@ function updateViewsCursor() {
     el.style.cursor = zoom ? (S.keys.alt ? 'zoom-out' : 'zoom-in')
       : S.spaceDown ? (S.keys.shift ? ROTATE_CURSORS.ne : 'grab')
       : S.tool === 'hand' ? 'grab'
-      : HANDLE_CURSORS[hv] || (S.tool === 'pen' && !S.keys.ctrl ? 'crosshair' : SELECT_CURSOR);
+      : hv === 'grab' ? 'grab' : HANDLE_CURSORS[hv] || (S.tool === 'pen' && !S.keys.ctrl ? 'crosshair' : SELECT_CURSOR);
   }
 }
 function hoverView(id, q) {
   if (!V3.ok) return;
   $(id).dataset.hover = S.spaceDown || S.tool === 'zoom' || S.tool === 'hand' ? '' : hitViewHandle(id, q) || '';
+  // オレンジの折り線があるとき、つかめる線にマウスが乗ったら緑
+  const oh = S.foldHinge && !S.spaceDown && SEL_TOOLS.has(S.tool) && findHinge(S.foldHinge);
+  const gl = oh ? hitGrabLine(oh, (w) => localToViewW(id, w), q) : null;
+  const next = gl ? { face: gl.face.id, seg: gl.seg, view: id } : null;
+  if (JSON.stringify(V3.grabLine || null) !== JSON.stringify(next)) { V3.grabLine = next; for (const v of VIEWS) drawViewBox(v.id); }
+  if (gl) $(id).dataset.hover = 'grab';
   updateViewsCursor();
 }
 // ドラッグ中の数値

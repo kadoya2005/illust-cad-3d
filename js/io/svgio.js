@@ -261,10 +261,12 @@ function parsePlane(v) {
 // 折りたたみの角度は data-icad-fold="角度"（重しの面は "角度,fixed"）
 function parseFold(v) {
   if (!v) return {};
-  const [d, f] = v.split(',');
-  return isFinite(+d) ? { fold: { deg: +d, ...(f === 'fixed' ? { fixed: true } : {}) } } : {};
+  try { const o = JSON.parse(v); if (o && typeof o === 'object') return { fold: o }; } catch (_) { /* 試作1の形 */ }
+  const [d] = v.split(',');
+  return isFinite(+d) ? { fold: { deg: +d } } : {};
 }
-const foldAttr = (n) => (n.fold ? ` data-icad-fold="${fmt(n.fold.deg || 0)}${n.fold.fixed ? ',fixed' : ''}"` : '');
+// 折りたたみ（折り線ごとの角度・土台の置き方）は data-icad-fold に JSON で
+const foldAttr = (n) => (n.fold && Object.keys(n.fold).length ? ` data-icad-fold="${svgEsc(JSON.stringify(n.fold))}"` : '');
 const planeAttr = (n) => (n.plane ? ` data-icad-plane="${[...n.plane.o, ...n.plane.u, ...n.plane.v].map(fmt).join(',')}"` : '');
 function nodeToSVG(n, ind) {
   // data-icad-id：読み込み直しても ID が変わらないように（3D の断面が ID で参照するため）

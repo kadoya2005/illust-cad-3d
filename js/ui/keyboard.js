@@ -43,9 +43,9 @@ document.addEventListener('keydown', (e) => {
   if (ctrl) {
     let ok = true;
     if (k === ':' || (k === ';' && !S.jis)) { if (alt) toggleGuideLock(); else toggleGuides(); }
-    else if (k === '@' || k === "'") toggleGrid();
-    else if (k === '`' || (k === '"' && c === 'Quote')) toggleSnapGrid();
-    else if (k === '"') toggleGrid();                 // 日本語キーボードの Ctrl+Shift+2（"）
+    // グリッド：日本語キーボードは Ctrl+¥・Ctrl+Shift+¥（イラレと同じ）、英語キーボードは Ctrl+'・Ctrl+Shift+'
+    else if (c === 'IntlYen' || k === '¥' || k === '|' || (k === '\\' && S.jis)) { if (sh) toggleSnapGrid(); else toggleGrid(); }
+    else if (k === "'" || (k === '"' && c === 'Quote')) { if (sh) toggleSnapGrid(); else toggleGrid(); }
     else if (kc === 'Z') { if (sh) redo(); else undo(); }
     else if (kc === 'Y') toggleOutline();
     else if (kc === 'A') { if (sh) deselectAll(); else selectAll(); }
@@ -87,7 +87,7 @@ document.addEventListener('keydown', (e) => {
   if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); deleteSelection(); return; }
   if (k === 'Enter' || k === 'Escape') {
     if (S.drawing) { e.preventDefault(); endDrawing(); }
-    else if (k === 'Escape') closeMenus();
+    else if (k === 'Escape') { closeMenus(); if (S.foldHinge) { S.foldHinge = null; render(); updateUI(); } }   // オレンジの折り線を外す
     else if (SEL_TOOLS.has(S.tool) && S.sel.size) { e.preventDefault(); openXfDialog('move'); }   // イラレと同じく Enter で「移動」
     return;
   }

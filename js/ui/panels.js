@@ -30,7 +30,7 @@ const MENUS = {
     ['正面図・側面図', '', toggle3dViews, () => S.show3d], ['平面図を組み立てた形で見る', '', togglePlanFolded, () => S.planFolded],
     ['定規', 'Ctrl+R', toggleRulers, () => S.rulers], ['スマートガイド', 'Ctrl+U', toggleSmart, () => S.smart], '-',
     ['ガイドを表示', 'Ctrl+:', toggleGuides, () => S.showGuides], ['ガイドをロック', 'Ctrl+Alt+:', toggleGuideLock, () => S.guidesLocked], ['ガイドを消去', '', clearGuides], '-',
-    ['グリッドを表示', 'Ctrl+@', toggleGrid, () => S.grid], ['グリッドにスナップ', 'Ctrl+Shift+@', toggleSnapGrid, () => S.snapGrid],
+    ['グリッドを表示', 'Ctrl+¥', toggleGrid, () => S.grid], ['グリッドにスナップ', 'Ctrl+Shift+¥', toggleSnapGrid, () => S.snapGrid],
   ],
 };
 function buildMenu(name) {
@@ -105,15 +105,15 @@ function updateUI() {
   $('btnExtrude').disabled = !prof.length;
   $('btnUnextrude').disabled = !exs.some(Boolean);
   // 折りたたみ：選んだ面の角度（ばらばらなら空欄）
-  const fs = selectedFoldFaces();
-  const degs = fs.movable.map((it) => (it.fold && it.fold.deg) || 0);
-  const fd = $('inFoldDeg');
-  fd.disabled = !fs.movable.length;
+  const fs = selectedFoldFaces(), oh = S.foldHinge && findHinge(S.foldHinge);
+  const degs = oh ? [hingeDeg(oh.A, oh.B)] : fs.movable.map((it) => { const fi = FOLD_INFO.get(it.id); return fi ? hingeDeg(it, fi.parent) : 0; });
+  const fd = $('inFoldDeg'), can = !!oh || fs.movable.length > 0;
+  fd.disabled = !can;
   if (document.activeElement !== fd) fd.value = degs.length && degs.every((d) => d === degs[0]) ? r2(degs[0]) : '';
-  $('btnFold90').disabled = $('btnFold0').disabled = !fs.movable.length;
+  $('btnFold90').disabled = $('btnFold0').disabled = !can;
   $('btnPlanFolded').textContent = S.planFolded ? '平面図：組み立て' : '平面図：展開図';
   $('btnPlanFolded').classList.toggle('on', !!S.planFolded);
-  $('foldNote').textContent = fs.movable.length ? '' : fs.roots.length ? '土台の面です（動きません）' : fs.alone.length ? 'ほかの面と辺がつながっていません' : '辺をぴったり重ねた面を選ぶと折れます';
+  $('foldNote').textContent = oh ? '折り線（オレンジ）を選んでいます。正面図・側面図でほかの線をつかむと、その側が折れます' : fs.movable.length ? '' : fs.roots.length ? '土台の面です（動きません）' : fs.alone.length ? 'ほかの面と辺がつながっていません' : '正面図・側面図で折り線をクリックするとオレンジになります';
   const flags = [];
   if (S.smart) flags.push('スマートガイド');
   if (S.snapGrid) flags.push('グリッドにスナップ');
@@ -148,21 +148,36 @@ function renderLayers() {
     ul.appendChild(li);
   }
 }
+// レイヤー名をダブルクリックで、その場で名前を変える（イラレと同じ）
+function startLayerRename(id) {
+  const li = $('layerList').querySelector(`li[data-id="${id}"]`), L = doc.layers.find((x) => x.id === id);
+  if (!li || !L) return;
+  const nm = li.querySelector('.nm');
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.value = L.name; inp.className = 'nmEdit';
+  nm.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = (ok) => {
+    if (done) return; done = true;
+    const v = inp.value.trim();
+    if (ok && v && v !== L.name) { L.name = v; commit(); }
+    renderLayers();
+  };
+  inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false); });
+  inp.addEventListener('blur', () => finish(true));
+}
 $('layerList').addEventListener('click', (e) => {
+  if (e.target.closest('.nmEdit')) return;
   const li = e.target.closest('li');
   if (!li) return;
+  // 1回目のクリックで一覧が作り直されるので、ダブルクリックは「2回目のクリック」で受ける
+  if (e.detail === 2 && !e.target.closest('.ib')) { startLayerRename(li.dataset.id); return; }
   const L = doc.layers.find((x) => x.id === li.dataset.id);
   if (!L) return;
   if (e.target.closest('.eye')) { L.visible = !L.visible; cleanSel(); render(); commit(); return; }
   if (e.target.closest('.lock')) { L.locked = !L.locked; cleanSel(); render(); commit(); return; }
   S.activeLayer = L.id; updateUI();
-});
-$('layerList').addEventListener('dblclick', (e) => {
-  const li = e.target.closest('li');
-  if (!li || e.target.closest('.ib')) return;
-  const L = doc.layers.find((x) => x.id === li.dataset.id);
-  const v = prompt('レイヤー名', L.name);
-  if (v && v.trim()) { L.name = v.trim(); commit(); }
 });
 $('layerAdd').addEventListener('click', () => {
   const n = doc.layers.length;

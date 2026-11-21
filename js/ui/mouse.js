@@ -18,6 +18,12 @@ stage.addEventListener('pointerdown', (e) => {
   if (S.drawing && t !== 'pen' && t !== 'hand' && t !== 'zoom') endDrawing();
   else if (S.drawing && t === 'pen') { const f = findItem(S.drawing.id); if (f && !onTop(f.item)) endDrawing(); }   // 正面図・側面図で描いていたパスは、平面図では続けない
   S.hover = null;
+  // 選択ツールで折り線をクリックすると、その折り線もオレンジにする（面はいつもどおり選ばれる）
+  if (SEL_TOOLS.has(t) && typeof FOLD_HINGES !== 'undefined') {
+    let best = null, bd = tol();
+    for (const h of FOLD_HINGES) { const [a, b] = planHingePts(h); const d = segDist(p, a, b); if (d < bd) { bd = d; best = h; } }
+    if (best) S.foldHinge = hingeKey(best.A, best.B);
+  }
   Tools[t].down(e, p, sp);
   drawOverlay(); updateCursor();
 });

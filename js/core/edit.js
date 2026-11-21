@@ -7,13 +7,15 @@ function restoreFrom(orig) { for (const [id, subs] of orig) { const f = findItem
 
 function duplicateSelection() {
   const tops = selectedTops();
-  const copies = [];
+  const copies = [], origs = [];
   for (let k = tops.length - 1; k >= 0; k--) {
     const t = tops[k];
     const c = reid(clone(t.node));
     t.parent.splice(t.index + 1, 0, c);
-    copies.push(c);
+    copies.push(c); origs.push(t.node);
   }
+  // 折った箱のコピーは、コピーどうしで折れたまま（選んだもの全部で ID を付け替える）
+  if (typeof remapFoldRefs === 'function') remapFoldRefs(origs, copies);
   S.sel.clear();
   copies.forEach((c) => selectNode(c, true));
 }
@@ -266,8 +268,8 @@ function setColor(which, val, doCommit = true) {
   if (doCommit) commit(); else updateUI();
 }
 function defaultColors() {
-  S.fill = '#ffffff'; S.stroke = '#000000'; S.sw = 1;
-  for (const it of selectedItems()) { it.fill = S.fill; it.stroke = S.stroke; it.sw = 1; }
+  S.fill = '#ffffff'; S.stroke = '#000000'; S.sw = 0.35;
+  for (const it of selectedItems()) { it.fill = S.fill; it.stroke = S.stroke; it.sw = 0.35; }
   renderArt(); commit();
 }
 function swapColors() {
@@ -305,6 +307,7 @@ function pasteItems(nodes, mode) {
   }
   if (!layerWritable(L)) { toast('ロック中または非表示のレイヤーには貼り付けられません'); return; }
   const copies = clone(nodes).map(reid);
+  if (typeof remapFoldRefs === 'function') remapFoldRefs(nodes, copies);
   copies.forEach((n) => { n.hidden = false; n.locked = false; leaves([n]).forEach(normalizeLeaf); });
   if (mode === 'center') {
     const bb = Geo.bbox(leaves(copies));
