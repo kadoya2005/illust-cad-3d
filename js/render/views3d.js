@@ -284,8 +284,15 @@ function hitFlat(id, q) {
   return best;
 }
 // 選んでいるものの範囲（平面図の bbox と高さ）
+// 折りたたみの面を選んでいたら、つながっている面ぜんぶ（箱ごと）を対象にする
+function expandFoldComps(items) {
+  if (typeof FOLD_SHOW === 'undefined' || !items.some((it) => FOLD_SHOW.has(it.id))) return items;
+  const out = new Set(items);
+  for (const t of foldTrees()) if (t.comp.length > 1 && t.comp.some((f) => out.has(f))) t.comp.forEach((f) => out.add(f));
+  return [...out];
+}
 function selRange() {
-  const items = selectedItems();
+  const items = expandFoldComps(selectedItems());
   if (!items.length) return null;
   const wr = worldRange(items);
   if (!wr) return null;
@@ -295,7 +302,6 @@ function selRange() {
 }
 // その図の画面での、選んでいるものの枠（px）
 function viewBox(id) {
-  if (!editable(id)) return null;
   const sr = selRange();
   if (!sr) return null;
   const vw = V3.views[id], r = vw.box.getBoundingClientRect();
@@ -306,7 +312,8 @@ function viewBox(id) {
     const sx = ((pr.x + 1) / 2) * r.width, sy = ((1 - pr.y) / 2) * r.height;
     x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
   }
-  return { x0, x1, y0, y1, ...sr };
+  // ハンドル（伸び縮み・押し出し）が使えるのは、床に平らなものを真横から見ているときだけ
+  return { x0, x1, y0, y1, ...sr, handles: sr.planar && editable(id) };
 }
 const VB_HANDLES = (b) => {
   const mx = (b.x0 + b.x1) / 2, my = (b.y0 + b.y1) / 2;
@@ -351,7 +358,7 @@ function drawViewBox(id) {
   if (!b || S.hideEdges) { svg.innerHTML = nodes; return; }
   const col = findItem(b.items[0].id).layer.color;
   let h = nodes + `<rect x="${b.x0}" y="${b.y0}" width="${Math.max(0, b.x1 - b.x0)}" height="${Math.max(0, b.y1 - b.y0)}" fill="none" stroke="${col}" stroke-width="1"/>`;
-  if (b.planar) for (const [x, y] of Object.values(VB_HANDLES(b))) h += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="#fff" stroke="${col}" stroke-width="1"/>`;
+  if (b.handles) for (const [x, y] of Object.values(VB_HANDLES(b))) h += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="#fff" stroke="${col}" stroke-width="1"/>`;
   svg.innerHTML = h;
 }
 // この図の向きの平面か（正面図なら正面の板、側面図なら側面の板。奥行きはどこでもよい）
@@ -457,7 +464,7 @@ function endViewPen(e, q) {
 
 function hitViewHandle(id, q) {
   const b = viewBox(id);
-  if (!b || !b.planar) return null;
+  if (!b || !b.handles) return null;
   let best = null, bd = 6;
   for (const [k, [x, y]] of Object.entries(VB_HANDLES(b))) { const d = Math.hypot(x - q.x, y - q.y); if (d < bd) { bd = d; best = k; } }
   return best;
@@ -480,19 +487,81 @@ function snapZ(d, edges, dz, e) {
 }
 function startViewXf(id, kind, handle, q) {
   const sr = selRange();
-  if (!sr || !sr.planar) return null;   // 正面・側面に置いたパスの移動は、まだ（選ぶだけ）
+  if (!sr) return null;
   if (V3.fit) V3.hold = V3.fit;   // ドラッグが終わるまで画面の縮尺を変えない
+  // 折った箱・正面や側面に描いたパスを含むとき、または回して見ているときは、3D でそのまま平行移動
+  if (kind === 'move' && (!sr.planar || !editable(id))) {
+    const items = sr.items;
+    return { type: 'vxf', kind: 'move3d', view: id, s: q, sr, moved: false, rot: !editable(id), zRef: sr.zMin,
+      snap: new Map(items.map((it) => [it.id, clone({ subs: it.subs, plane: it.plane || null, fold: it.fold || null, x3d: it.x3d || null })])) };
+  }
+  if (!sr.planar || !editable(id)) return null;
   return {
     type: 'vxf', kind, handle, view: id, s: q, sr, moved: false,
-    subs: snapshotSel(),
+    subs: new Map(sr.items.map((it) => [it.id, clone(it.subs)])),   // 箱ごと動かすこともあるので、選んだものだけでなく対象全部
     x3d: new Map(sr.items.map((it) => [it.id, it.x3d ? { ...it.x3d } : null])),
     snaps: snapHeights(new Set(sr.items.map((it) => it.id))),
   };
+}
+// 図の画面の点 → 高さ z の水平面の上の 3D の点（回して見ている図で、床と平行に動かすため）
+function viewToFloor(id, q, z) {
+  const vw = V3.views[id], r = vw.box.getBoundingClientRect();
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2((q.x / r.width) * 2 - 1, -(q.y / r.height) * 2 + 1), vw.camera);
+  const o = rc.ray.origin, dir = rc.ray.direction;   // three.js：Y が高さ
+  if (Math.abs(dir.y) < 1e-6) return null;
+  const t = (z - o.y) / dir.y;
+  return { x: o.x + dir.x * t, y: o.z + dir.z * t, z };
+}
+// 3D でそのまま平行移動（d = [dx, dy, dz]、アプリの座標）
+//   折った箱：土台の置き方をずらす（展開図はそのまま）／正面・側面に描いたパス：作業平面をずらす
+//   床のパス・押し出し：形を横にずらし、押し出しは高さもずらす
+function translateWorld(items, d) {
+  const done = new Set();
+  for (const t of foldTrees()) {
+    if (t.comp.length < 2 || !t.comp.some((f) => items.includes(f))) continue;
+    const r = t.root, b = (r.fold && r.fold.base) || PLANE_TOP;
+    r.fold = { ...(r.fold || {}), base: { o: [b.o[0] + d[0], b.o[1] + d[1], b.o[2] + d[2]], u: [...b.u], v: [...b.v] } };
+    t.comp.forEach((f) => done.add(f));
+  }
+  for (const it of items) {
+    if (done.has(it)) continue;
+    if (it.plane && !it.fold) it.plane = { ...it.plane, o: it.plane.o.map((v, i) => v + d[i]) };
+    else {
+      mapItem(it, (p) => P(p.x + d[0], p.y + d[1]));
+      if (it.x3d) it.x3d = { ...it.x3d, z0: it.x3d.z0 + d[2] };
+    }
+  }
+}
+function moveViewXf3d(d, q, e) {
+  // 元に戻してから動かす
+  for (const [id, o] of d.snap) {
+    const f = findItem(id); if (!f) continue;
+    const it = f.item; it.subs = clone(o.subs);
+    for (const k of ['plane', 'fold', 'x3d']) { if (o[k]) it[k] = clone(o[k]); else delete it[k]; }
+  }
+  let w;
+  if (d.rot) {
+    // 回して見ている図：選んだものの底の高さの水平面の上で動かす（上下は真横から見た図で）
+    const a = viewToFloor(d.view, d.s, d.zRef), b = viewToFloor(d.view, q, d.zRef);
+    if (!a || !b) return;
+    w = [b.x - a.x, b.y - a.y, 0];
+    if (e.shiftKey) { if (Math.abs(w[0]) > Math.abs(w[1])) w[1] = 0; else w[0] = 0; }
+  } else {
+    let dx = q.x - d.s.x, dy = q.y - d.s.y;
+    if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+    const sc = V3.scale, h = (dx / sc) * hSign(d.view), dz = -dy / sc;
+    w = hAxis(d.view) === 'x' ? [h, 0, dz] : [0, h, dz];
+  }
+  translateWorld(d.sr.items, w);
+  d.tip = `横 ${r2(w[0])}　奥行き ${r2(w[1])}　高さ ${r2(w[2])} mm`;
+  render(); updateUI();
 }
 function moveViewXf(d, q, e) {
   let dx = q.x - d.s.x, dy = q.y - d.s.y;
   if (!d.moved && Math.hypot(dx, dy) < 3) return;
   d.moved = true;
+  if (d.kind === 'move3d') { moveViewXf3d(d, q, e); return; }
   const sc = V3.scale, ax = hAxis(d.view), sg = hSign(d.view);
   const { bb, zMin, zMax, items } = d.sr;
   restoreFrom(d.subs);
@@ -634,25 +703,23 @@ for (const v of VIEWS) {
       }
     }
     // 折り線をクリック → オレンジ（もう一度クリックで外す）
+    // 折った箱は辺のほとんどが折り線なので、折り線の上でも「ドラッグなら移動」にする（クリックだけならオレンジ）
     const hh = !e.shiftKey && hitHinge(toScr3, q);
-    if (hh) {
-      const k = hingeKey(hh.A, hh.B);
-      S.foldHinge = S.foldHinge === k ? null : k;
-      V3.grabLine = null;
-      render(); updateUI();
-      return;
-    }
     // 立体・線をクリック
     const id = hitView(v.id, q.x, q.y) || hitFlat(v.id, q);
     const f = id && findItem(id);
-    if (f) {
+    const pickFace = () => {
       const target = topOf(f.item);
       const ls = leaves([target]);
       const wasSel = ls.every((it) => S.sel.has(it.id) && isFullySel(it));
-      if (e.shiftKey && wasSel) { ls.forEach((it) => S.sel.delete(it.id)); afterSelect(); render(); updateUI(); return; }
+      if (e.shiftKey && wasSel) { ls.forEach((it) => S.sel.delete(it.id)); afterSelect(); render(); updateUI(); return false; }
       if (e.shiftKey || !wasSel) selectNode(target, e.shiftKey);
       afterSelect(); render(); updateUI();
-      if (editable(v.id)) { grab(); drag = startViewXf(v.id, 'move', null, q); }
+      return true;
+    };
+    if (hh) { grab(); drag = { type: 'hingeOrMove', hh, pickFace: f ? pickFace : null, s: q }; return; }
+    if (f) {
+      if (pickFace()) { grab(); drag = startViewXf(v.id, 'move', null, q); }   // 回して見ている図でも、床と平行に動かせる
       return;
     }
     // 枠の中（何もないところでも）：移動
@@ -664,6 +731,14 @@ for (const v of VIEWS) {
     const q = local(e);
     if (!drag) { hoverView(v.id, q); return; }
     if (drag.type === 'pen') { viewPenMove(e, q); return; }
+    // 折り線の上から動かし始めた：面を選んで、移動に切り替える
+    if (drag.type === 'hingeOrMove') {
+      if (Math.hypot(q.x - drag.s.x, q.y - drag.s.y) < 3) return;
+      const s0 = drag.s;
+      drag = drag.pickFace && drag.pickFace() ? startViewXf(v.id, 'move', null, s0) : (insideViewBox(v.id, s0) ? startViewXf(v.id, 'move', null, s0) : null);
+      if (drag) { moveViewXf(drag, q, e); showTip(v.id, q, drag.moved ? drag.tip : ''); }
+      return;
+    }
     if (drag.type === 'fold') {
       if (!drag.moved && Math.hypot(q.x - drag.s.x, q.y - drag.s.y) < 3) return;
       drag.moved = true;
@@ -689,6 +764,12 @@ for (const v of VIEWS) {
   const end = (e) => {
     if (!drag) return;
     if (drag.type === 'pen') endViewPen(e, local(e));
+    if (drag.type === 'hingeOrMove') {   // 動かさずに離した：折り線をオレンジに（もう一度で外す）
+      const k = hingeKey(drag.hh.A, drag.hh.B);
+      S.foldHinge = S.foldHinge === k ? null : k;
+      V3.grabLine = null;
+      render(); updateUI();
+    }
     if (drag.type === 'fold') { V3.hold = null; V3.grabLine = null; showTip(v.id, null, ''); render(); commit(); }
     if (drag.type === 'vxf') { endViewXf(drag); showTip(v.id, null, ''); }
     drag = null; updateCursor();
