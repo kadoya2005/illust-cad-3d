@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>イラレCAD</title>
-<link rel="stylesheet" href="style.css?v=25">
+<link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
 <header id="topbar">
@@ -100,6 +100,32 @@
     </div>
   </section>
   <section>
+    <h2>3D 押し出し <span class="note">mm</span></h2>
+    <div class="grid2 ex3d">
+      <label title="押し出す高さ">高さ</label><input type="number" id="inExH" step="any" min="0">
+      <label title="底の高さ（床からどれだけ浮かせるか）">底</label><input type="number" id="inExZ" step="any">
+    </div>
+    <div class="row ex3dBtns">
+      <button id="btnExtrude" title="選んだ閉じたパスを押し出す">押し出す</button>
+      <button id="btnUnextrude" title="押し出しをやめて、平らなパスに戻す">解除</button>
+    </div>
+  </section>
+  <section>
+    <h2>折りたたみ <span class="note">試作</span></h2>
+    <div class="grid2 ex3d">
+      <label title="選んだ面を、つながっている面に対して何度起こすか（上へ ＋）">角度 °</label><input type="number" id="inFoldDeg" step="any" min="-180" max="180">
+    </div>
+    <div class="row ex3dBtns">
+      <button id="btnFold90" title="選んだ面を 90° 起こす">90°</button>
+      <button id="btnFold0" title="選んだ面を開く（0°）">開く</button>
+      <button id="btnUnfoldAll" title="全部の面を開いて、展開図に戻す">全部開く</button>
+    </div>
+    <div class="row ex3dBtns">
+      <button id="btnPlanFolded" title="平面図を、展開図か、組み立てた形（真上から見たところ）か切り替える">平面図：展開図</button>
+    </div>
+    <div class="note" id="foldNote"></div>
+  </section>
+  <section>
     <h2>整列
       <select id="alignTo" title="整列の基準">
         <option value="selection">選択範囲に整列</option>
@@ -147,32 +173,6 @@
       <button data-pf="trim" title="刈り込み"><svg viewBox="0 0 24 24"><path d="M3 3h11v5H8v8H3z" fill="currentColor"/><rect x="8" y="8" width="13" height="13" fill="currentColor" opacity=".55"/></svg></button>
       <button data-pf="minusBack" title="背面オブジェクトで型抜き"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="10.5" height="12" fill="none" stroke="currentColor" stroke-dasharray="2 1.5"/><path d="M14 8h7v13H8v-5h6z" fill="currentColor"/></svg></button>
     </div>
-  </section>
-  <section>
-    <h2>3D 押し出し <span class="note">mm</span></h2>
-    <div class="grid2 ex3d">
-      <label title="押し出す高さ">高さ</label><input type="number" id="inExH" step="any" min="0">
-      <label title="底の高さ（床からどれだけ浮かせるか）">底</label><input type="number" id="inExZ" step="any">
-    </div>
-    <div class="row ex3dBtns">
-      <button id="btnExtrude" title="選んだ閉じたパスを押し出す">押し出す</button>
-      <button id="btnUnextrude" title="押し出しをやめて、平らなパスに戻す">解除</button>
-    </div>
-  </section>
-  <section>
-    <h2>折りたたみ <span class="note">試作</span></h2>
-    <div class="grid2 ex3d">
-      <label title="選んだ面を、つながっている面に対して何度起こすか（上へ ＋）">角度 °</label><input type="number" id="inFoldDeg" step="any" min="-180" max="180">
-    </div>
-    <div class="row ex3dBtns">
-      <button id="btnFold90" title="選んだ面を 90° 起こす">90°</button>
-      <button id="btnFold0" title="選んだ面を開く（0°）">開く</button>
-      <button id="btnUnfoldAll" title="全部の面を開いて、展開図に戻す">全部開く</button>
-    </div>
-    <div class="row ex3dBtns">
-      <button id="btnPlanFolded" title="平面図を、展開図か、組み立てた形（真上から見たところ）か切り替える">平面図：展開図</button>
-    </div>
-    <div class="note" id="foldNote"></div>
   </section>
   <section>
     <h2>アートボード <span class="note">mm</span></h2>
@@ -232,39 +232,39 @@
   ui     … マウス・キーボード・パネル・ダイアログ
   io     … ファイルとクリップボード
 -->
-<script src="js/vendor/paper-core.min.js?v=25"></script>
-<script src="js/vendor/clipper.js?v=25"></script>
-<script src="js/vendor/three.min.js?v=25"></script>
-<script src="js/core/geom.js?v=25"></script>
-<script src="js/core/config.js?v=25"></script>
-<script src="js/core/plane.js?v=25"></script>
-<script src="js/core/state.js?v=25"></script>
-<script src="js/core/document.js?v=25"></script>
-<script src="js/core/selection.js?v=25"></script>
-<script src="js/core/history.js?v=25"></script>
-<script src="js/core/prefs.js?v=25"></script>
-<script src="js/core/snap.js?v=25"></script>
-<script src="js/core/pathfinder.js?v=25"></script>
-<script src="js/core/offset.js?v=25"></script>
-<script src="js/core/solids.js?v=25"></script>
-<script src="js/core/fold.js?v=25"></script>
-<script src="js/io/svgio.js?v=25"></script>
-<script src="js/render/view.js?v=25"></script>
-<script src="js/render/hittest.js?v=25"></script>
-<script src="js/render/views3d.js?v=25"></script>
-<script src="js/core/edit.js?v=25"></script>
-<script src="js/tools/drag.js?v=25"></script>
-<script src="js/tools/transform.js?v=25"></script>
-<script src="js/tools/shapes.js?v=25"></script>
-<script src="js/tools/tools.js?v=25"></script>
-<script src="js/ui/dialogs.js?v=25"></script>
-<script src="js/ui/mouse.js?v=25"></script>
-<script src="js/ui/keyboard.js?v=25"></script>
-<script src="js/io/clipboard.js?v=25"></script>
-<script src="js/io/files.js?v=25"></script>
-<script src="js/io/stl.js?v=25"></script>
-<script src="js/ui/panels.js?v=25"></script>
-<script src="js/ui/help.js?v=25"></script>
-<script src="js/app.js?v=25"></script>
+<script src="js/vendor/paper-core.min.js?v=27"></script>
+<script src="js/vendor/clipper.js?v=27"></script>
+<script src="js/vendor/three.min.js?v=27"></script>
+<script src="js/core/geom.js?v=27"></script>
+<script src="js/core/config.js?v=27"></script>
+<script src="js/core/plane.js?v=27"></script>
+<script src="js/core/state.js?v=27"></script>
+<script src="js/core/document.js?v=27"></script>
+<script src="js/core/selection.js?v=27"></script>
+<script src="js/core/history.js?v=27"></script>
+<script src="js/core/prefs.js?v=27"></script>
+<script src="js/core/snap.js?v=27"></script>
+<script src="js/core/pathfinder.js?v=27"></script>
+<script src="js/core/offset.js?v=27"></script>
+<script src="js/core/solids.js?v=27"></script>
+<script src="js/core/fold.js?v=27"></script>
+<script src="js/io/svgio.js?v=27"></script>
+<script src="js/render/view.js?v=27"></script>
+<script src="js/render/hittest.js?v=27"></script>
+<script src="js/render/views3d.js?v=27"></script>
+<script src="js/core/edit.js?v=27"></script>
+<script src="js/tools/drag.js?v=27"></script>
+<script src="js/tools/transform.js?v=27"></script>
+<script src="js/tools/shapes.js?v=27"></script>
+<script src="js/tools/tools.js?v=27"></script>
+<script src="js/ui/dialogs.js?v=27"></script>
+<script src="js/ui/mouse.js?v=27"></script>
+<script src="js/ui/keyboard.js?v=27"></script>
+<script src="js/io/clipboard.js?v=27"></script>
+<script src="js/io/files.js?v=27"></script>
+<script src="js/io/stl.js?v=27"></script>
+<script src="js/ui/panels.js?v=27"></script>
+<script src="js/ui/help.js?v=27"></script>
+<script src="js/app.js?v=27"></script>
 </body>
 </html>

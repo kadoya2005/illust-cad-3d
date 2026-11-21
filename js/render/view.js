@@ -350,6 +350,12 @@ function drawOverlay() {
       h += `<text x="${q.x + 8}" y="${q.y - 6}" font-size="11" fill="${SMART_COLOR}" stroke="#fff" stroke-width="3" paint-order="stroke">${S.snapViz.label}</text>`;
     }
   }
+  // 移動中に面と面の辺がぴったり接した：その辺をオレンジに、カーソルの横に「折り線」
+  if (S.drag && S.drag.type === 'move' && S.drag.contacts && S.drag.contacts.length && S.mouseScr) {
+    for (const e of S.drag.contacts) { const a = sp(e.a), b = sp(e.b); h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ff8c1a" stroke-width="3" stroke-linecap="round"/>`; }
+    const m = S.mouseScr;
+    h += `<g transform="translate(${m.x + 14},${m.y + 16})"><rect x="0" y="-12" width="96" height="18" rx="3" fill="#ff8c1a"/><text x="6" y="1" font-size="12" font-weight="700" fill="#fff">✓ 折り線になる</text></g>`;
+  }
   if (t === 'pen' && S.penHint && S.mouseScr && !S.drag) {
     h += `<text x="${S.mouseScr.x + 10}" y="${S.mouseScr.y + 18}" font-size="13" font-weight="700" fill="#fff" stroke="#000" stroke-width="2.5" paint-order="stroke">${S.penHint}</text>`;
   }

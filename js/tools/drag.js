@@ -58,6 +58,11 @@ function dragMove(e, p) {
   }
   d.dx = dx; d.dy = dy; d.lastP = p;
   renderArt();
+  // 動かしている面が、ほかの面と辺でぴったり接したか（折り線になるか）。renderArt で折り線を探し直している
+  if (typeof FOLD_HINGES !== 'undefined') {
+    const moved = new Set(d.orig.keys());
+    d.contacts = FOLD_HINGES.filter((h) => moved.has(h.A.id) !== moved.has(h.B.id)).map((h) => h.e);
+  }
 }
 // Alt を押した・離したときに、マウスを動かさなくてもすぐ切り替える
 function refreshMoveDrag(e) {
