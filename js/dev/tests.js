@@ -119,6 +119,20 @@
       S.drag = null;
       return ok;
     }],
+    ['少し傾いた辺：両端がそろうときだけ吸い付く（1° は吸い付かない・0.2° は折り線になる）', () => {
+      // b の左の辺（a の右の辺 x=80 から 0.3mm 右）を、左上の角を中心に少し傾けて置き、辺の吸着が働くか・折り線になるかを見る
+      const tilted = (deg) => {
+        const r = (deg * Math.PI) / 180, b = sq('b', 80.3, 100, 30, 40);
+        b.subs[0].nodes[3].x = 80.3 + Math.sin(r) * 40; b.subs[0].nodes[3].y = 100 + Math.cos(r) * 40;
+        useDoc([sq('a', 50, 100, 30, 40), b]);
+        const c = foldEdgeSnap(new Set(['b']), 8 / inputScale());
+        if (c) { F('b').subs[0].nodes.forEach((n) => moveNode(n, c.x, c.y)); render(); }
+        return { edge: !!c, x: F('b').subs[0].nodes[0].x, hinge: FOLD_HINGES.length };
+      };
+      const big = tilted(1), small = tilted(0.2);
+      // 1°：ずらしても両端が合わないので吸い付かない。0.2°：吸い付いて折り線になる
+      return !big.edge && big.hinge === 0 && small.edge && near(small.x, 80, 0.1) && small.hinge === 1;
+    }],
     ['中断したら元の角度に戻る（控えと戻し）', () => {
       useDoc(cube()); foldCube();
       const snap = snapshotFolds();

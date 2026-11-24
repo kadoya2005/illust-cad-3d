@@ -58,24 +58,41 @@ function shapeFromDrag(kind, a, b, shift, alt) {
   const L = Math.min(x0, x1), R = Math.max(x0, x1), T = Math.min(y0, y1), B = Math.max(y0, y1);
   return kind === 'rect' ? rectSub(L, T, R, B) : ellipseSub((L + R) / 2, (T + B) / 2, (R - L) / 2, (B - T) / 2);
 }
+// 画面をクリックしたとき：数値で作る（イラレと同じ。移動などと同じ画面で、プレビューもできる）
+//   長方形・楕円：幅・高さ・厚み（厚みを入れると、その高さで押し出した立体になる。空欄か 0 なら平らなパス）
+//   直線：長さ・角度
 function shapeDialog(kind, p, alt) {
   const isLine = kind === 'line';
-  const v = prompt(isLine ? '長さ（pt）と角度（度）をカンマで区切って入力してください' : '幅と高さ（pt）をカンマで区切って入力してください', '100, ' + (isLine ? '0' : '100'));
-  if (v == null) return;
-  const [a, b] = v.split(/[,、\s]+/).map(parseFloat);
-  if (!isFinite(a) || !isFinite(b)) { toast('数値を読めませんでした'); return; }
-  let sb;
-  if (isLine) {
-    const r = (b * Math.PI) / 180, q = P(p.x + Math.cos(r) * a, p.y - Math.sin(r) * a);
-    sb = alt ? { nodes: [mkNode(2 * p.x - q.x, 2 * p.y - q.y), mkNode(q.x, q.y)], closed: false } : { nodes: [mkNode(p.x, p.y), mkNode(q.x, q.y)], closed: false };
-  } else {
-    if (a <= 0 || b <= 0) { toast('幅と高さは 0 より大きくしてください'); return; }
-    const x0 = alt ? p.x - a / 2 : p.x, y0 = alt ? p.y - b / 2 : p.y;
-    sb = kind === 'rect' ? rectSub(x0, y0, x0 + a, y0 + b) : ellipseSub(x0 + a / 2, y0 + b / 2, a / 2, b / 2);
-  }
-  const it = newItem([sb], isLine);
-  activeLayerObj().items.push(it);
-  selItem(it, false); render(); commit();
+  const last = S.dlgLast[kind] || (isLine ? { len: 30, ang: 0 } : { w: 30, h: 30, t: 0 });
+  const make = (v) => {
+    if (isLine) {
+      if (!(v.len > 0)) return null;
+      const r = (v.ang * Math.PI) / 180, q = P(p.x + Math.cos(r) * v.len, p.y - Math.sin(r) * v.len);
+      return alt ? { nodes: [mkNode(2 * p.x - q.x, 2 * p.y - q.y), mkNode(q.x, q.y)], closed: false } : { nodes: [mkNode(p.x, p.y), mkNode(q.x, q.y)], closed: false };
+    }
+    if (!(v.w > 0) || !(v.h > 0)) return null;
+    const x0 = alt ? p.x - v.w / 2 : p.x, y0 = alt ? p.y - v.h / 2 : p.y;
+    return kind === 'rect' ? rectSub(x0, y0, x0 + v.w, y0 + v.h) : ellipseSub(x0 + v.w / 2, y0 + v.h / 2, v.w / 2, v.h / 2);
+  };
+  openDialog({
+    title: isLine ? '直線' : kind === 'rect' ? '長方形' : '楕円',
+    fields: isLine
+      ? [{ id: 'len', label: '長さ', value: fmt(last.len), unit: 'mm' }, { id: 'ang', label: '角度', value: fmt(last.ang), unit: '°（反時計回り）' }]
+      : [{ id: 'w', label: '幅', value: fmt(last.w), unit: 'mm' }, { id: 'h', label: '高さ', value: fmt(last.h), unit: 'mm' },
+        { id: 't', label: '厚み', value: last.t ? fmt(last.t) : '', unit: 'mm（空欄なら平らなパス）' }],
+    copy: false,
+    apply: (v, copy, pv) => {
+      const sb = make(v);
+      if (!sb) { if (!pv) toast(isLine ? '長さは 0 より大きくしてください' : '幅と高さは 0 より大きくしてください'); return; }
+      const it = newItem([sb], isLine);
+      if (!isLine && v.t > 0) it.x3d = { z0: 0, h: v.t };
+      activeLayerObj().items.push(it);
+      selItem(it, false);
+      if (pv) return;
+      S.dlgLast[kind] = isLine ? { len: v.len, ang: v.ang } : { w: v.w, h: v.h, t: v.t > 0 ? v.t : 0 };
+      render(); commit();
+    },
+  });
 }
 
 function setTool(t) {

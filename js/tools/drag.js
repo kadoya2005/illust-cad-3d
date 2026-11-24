@@ -88,6 +88,8 @@ function foldEdgeSnap(moved, tol) {
     if (Math.abs(md.x * u.y - md.y * u.x) > 0.02 * ml) continue;   // 平行でない（1° くらいまで）
     const sa = vdot(vsub(m.a, f.a), nrm), sb = vdot(vsub(m.b, f.a), nrm);
     if (Math.abs(sa) > tol || Math.abs(sb) > tol) continue;
+    // 少し傾いた辺は、平行にずらしても両端は合わない。ずらしたあと両端とも折り線になる幅に入るときだけ吸い付く
+    if (Math.abs(sa - sb) > FOLD_GAP) continue;
     const ta = vdot(vsub(m.a, f.a), u), tb = vdot(vsub(m.b, f.a), u);
     const ov = Math.min(L, Math.max(ta, tb)) - Math.max(0, Math.min(ta, tb));
     if (ov <= FOLD_MIN_LEN) continue;
