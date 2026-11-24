@@ -130,8 +130,14 @@ function showToolStatus() {
   $('stHint').textContent = meta.hint;
 }
 
+let LAYERS_SIG = '';
 function renderLayers() {
   const ul = $('layerList');
+  // 変わっていなければ作り直さない（ドラッグ中に毎回作り直すと重くなる）
+  const sig = S.activeLayer + '|' + doc.layers.map((L) => [L.id, L.name, L.color, L.visible, L.locked, leaves(L.items).some((it) => S.sel.has(it.id))].join(',')).join('/');
+  if (sig === LAYERS_SIG && ul.children.length === doc.layers.length && !ul.querySelector('.nmEdit')) return;
+  if (ul.querySelector('.nmEdit')) return;   // 名前を書き換えている最中は触らない
+  LAYERS_SIG = sig;
   ul.innerHTML = '';
   for (let i = doc.layers.length - 1; i >= 0; i--) {
     const L = doc.layers[i];
@@ -162,6 +168,7 @@ function startLayerRename(id) {
     if (done) return; done = true;
     const v = inp.value.trim();
     if (ok && v && v !== L.name) { L.name = v; commit(); }
+    inp.remove(); LAYERS_SIG = '';   // 書き換え欄を消してから、一覧を作り直す
     renderLayers();
   };
   inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false); });

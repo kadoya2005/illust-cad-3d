@@ -18,6 +18,23 @@ stage.addEventListener('pointerdown', (e) => {
   if (S.drawing && t !== 'pen' && t !== 'hand' && t !== 'zoom') endDrawing();
   else if (S.drawing && t === 'pen') { const f = findItem(S.drawing.id); if (f && !onTop(f.item)) endDrawing(); }   // 正面図・側面図で描いていたパスは、平面図では続けない
   S.hover = null;
+  // 平面図の回転ハンドル（つまみ）：真上から見て、つまみを折り線の方へ引くほど面が起きる
+  if (SEL_TOOLS.has(t) && typeof findHinge === 'function' && S.foldHinge) {
+    const oh = findHinge(S.foldHinge);
+    const hd = oh && hitFoldHandle(oh, (w) => toScr(P(w.x, w.y)), sp);
+    if (hd) {
+      const undo = snapshotFolds();
+      const d = startHingeDrag(oh, hd.face);
+      if (d) {
+        applyFolds();
+        const prev = hingeDeg(oh.A, oh.B);
+        S.activeTool = 'foldHandle';
+        S.drag = { type: 'foldPlan', d, grab2: hd.p2, s: sp, moved: false, undo, face: hd.face.id, range: prev < 0 ? [-180, 0] : [0, 180], side: foldSide(oh, hd.face) };
+        drawOverlay(); updateCursor();
+        return;
+      }
+    }
+  }
   // 選択ツールで折り線をクリックすると、その折り線もオレンジにする（面はいつもどおり選ばれる）
   if (SEL_TOOLS.has(t) && typeof FOLD_HINGES !== 'undefined') {
     let best = null, bd = tol();
@@ -39,15 +56,39 @@ stage.addEventListener('pointermove', (e) => {
     S.hover = ['select', 'direct', 'eyedropper', 'addAnchor', 'convert', 'rotate'].includes(t) ? (hitItem(p) || {}).it?.id || null : null;
     S.penHint = t === 'pen' ? penHint(p, e.altKey, sp) : '';
     S.snapViz = ['pen', 'rect', 'ellipse', 'line'].includes(t) && !e.shiftKey ? snapPoint(p, cachedCands()).viz : null;
+    // 回転ハンドルにマウスが乗ったら緑
+    const oh = SEL_TOOLS.has(t) && typeof findHinge === 'function' && S.foldHinge && findHinge(S.foldHinge);
+    const hd = oh && hitFoldHandle(oh, (w) => toScr(P(w.x, w.y)), sp);
+    S.foldHandleHover = hd ? hd.face.id : null;
     drawOverlay();
     updateCursor();
   }
   if (S.rulers) drawRulers();
   $('stPos').textContent = `X ${p.x.toFixed(2)}  Y ${p.y.toFixed(2)} mm`;
 });
+// 平面図で回転ハンドルをドラッグ（Tools の1つとして扱う）
+Tools.foldHandle = {
+  down() {},
+  move(e, p, sp) {
+    const d = S.drag;
+    if (!d.moved && Math.hypot(sp.x - d.s.x, sp.y - d.s.y) < 3) return;
+    d.moved = true;
+    const raw = hingeAngleToward(d.d, d.grab2, (w) => toScr(P(w.x, w.y)), sp, d.range);
+    d.deg = snapFoldDeg(raw, e.shiftKey);
+    setHingeDeg(d.d.h.A, d.d.h.B, d.deg);
+    render(); updateUI();
+  },
+  up() { if (S.drag.moved) { render(); commit(); } },
+};
 function finishPointer(e, cancel) {
   if (!S.drag) return;
   const sp = evScr(e), p = toDoc(sp);
+  if (cancel && S.drag.type === 'foldPlan' && S.drag.undo) { restoreFolds(S.drag.undo); render(); }   // 中断されたら元の角度に
+  if (cancel && S.drag.type === 'move' && S.drag.moved) {   // 中断されたら元の位置に（コピー中ならコピーを消す）
+    const d = S.drag;
+    if (d.dup) { for (const id of d.orig.keys()) removeItem(id); S.sel = new Map([...d.baseSel].map(([k, v]) => [k, new Set(v)])); }
+    restoreFrom(d.base); renderArt();
+  }
   if (!cancel) Tools[S.activeTool].up(e, p, sp);
   if (SEL_TOOLS.has(S.activeTool)) S.xfOrigin = null;   // 選び直したら基準点は中心に戻る
   S.drag = null; S.marquee = null; S.activeTool = null; S.snapViz = null;

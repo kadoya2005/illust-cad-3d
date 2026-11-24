@@ -15,6 +15,10 @@
 //   （つかんだ側に土台があるときは、反対側の面を新しい土台にして、そのままの位置に残す）
 
 const FOLD_TOL = 0.01;   // mm
+// 手で並べた面は、辺がほんの少しずれたり重なったりしやすい。この幅までのずれは、同じ線とみなす
+const FOLD_GAP = 0.2;    // mm
+// これより短い重なりは折り線にしない（ずれて重なった面の、上下の辺どうしが少しだけ重なる分など）
+const FOLD_MIN_LEN = 0.5;   // mm
 
 // 折りたたみの面になれるパスか（正面図・側面図でペンで描いたパスは除く）
 function isFoldFace(it) {
@@ -61,10 +65,10 @@ function foldGraph() {
   const overlap = (e1, e2) => {
     const d = vsub(e1.e.b, e1.e.a), L = e1.len, u = vmul(d, 1 / L);
     const off = (p) => Math.abs((p.x - e1.e.a.x) * u.y - (p.y - e1.e.a.y) * u.x);
-    if (off(e2.e.a) > FOLD_TOL || off(e2.e.b) > FOLD_TOL) return null;
+    if (off(e2.e.a) > FOLD_GAP || off(e2.e.b) > FOLD_GAP) return null;
     const t = (p) => ((p.x - e1.e.a.x) * u.x + (p.y - e1.e.a.y) * u.y);
     const lo = Math.max(0, Math.min(t(e2.e.a), t(e2.e.b))), hi = Math.min(L, Math.max(t(e2.e.a), t(e2.e.b)));
-    return hi - lo > FOLD_TOL ? { a: vadd(e1.e.a, vmul(u, lo)), b: vadd(e1.e.a, vmul(u, hi)) } : null;
+    return hi - lo > FOLD_MIN_LEN ? { a: vadd(e1.e.a, vmul(u, lo)), b: vadd(e1.e.a, vmul(u, hi)) } : null;
   };
   const cand = [];
   for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
@@ -83,14 +87,14 @@ function foldGraph() {
     const mid = vlerp(c.ov.a, c.ov.b, 0.5);
     const dx = vsub(c.x.e.b, c.x.e.a);
     const parallel = (e) => { const d = vsub(e.e.b, e.e.a); return Math.abs(d.x * dx.y - d.y * dx.x) < 1e-6 * vlen(d) * vlen(dx); };
-    const crowd = edges.some((e) => e.f !== A && e.f !== B && parallel(e) && segDist(mid, e.e.a, e.e.b) < FOLD_TOL);
+    const crowd = edges.some((e) => e.f !== A && e.f !== B && parallel(e) && segDist(mid, e.e.a, e.e.b) < FOLD_GAP);
     if (crowd && !linked(A, B)) continue;   // どれとどれか決まらないので使わない
     paired.add(k);
     hinges.push({ A, B, e: { a: c.ov.a, b: c.ov.b }, segA: c.x.e.seg, segB: c.y.e.seg });
   }
   // 1枚の面に並んでついたフラップどうし（X・Y がどちらも Z に、一直線の折り線でついている）の境目は、
   // 折り線ではなく切れ目とみなす（つながったままだと、フラップを1枚ずつ折れない）
-  const onLine = (h1, h2) => [h2.e.a, h2.e.b].every((p) => Math.abs((p.x - h1.e.a.x) * (h1.e.b.y - h1.e.a.y) - (p.y - h1.e.a.y) * (h1.e.b.x - h1.e.a.x)) < FOLD_TOL * vdist(h1.e.a, h1.e.b));
+  const onLine = (h1, h2) => [h2.e.a, h2.e.b].every((p) => Math.abs((p.x - h1.e.a.x) * (h1.e.b.y - h1.e.a.y) - (p.y - h1.e.a.y) * (h1.e.b.x - h1.e.a.x)) < FOLD_GAP * vdist(h1.e.a, h1.e.b));
   const touch = (h, X) => h.A === X || h.B === X;
   const other = (h, X) => (h.A === X ? h.B : h.A);
   const kept = hinges.filter((h) => !hinges.some((h1) => h1 !== h && touch(h1, h.A) && !touch(h1, h.B)
@@ -280,8 +284,10 @@ function startHingeDrag(h, g) {
 }
 // つかんだ線の真ん中（g の 2D）が、マウスにいちばん近づく折り線の角度を探す
 // 真横から見ていると同じ位置になる角度が2つあることがあるので、今の角度に近い方を選ぶ
-function hingeAngleToward(d, grab2, toScreen, q) {
+// range：探す角度の範囲 [最小, 最大]（真上から見る平面図では、上に起こす側だけにする）
+function hingeAngleToward(d, grab2, toScreen, q, range) {
   const base = planeOf(d.fixed), prev = hingeDeg(d.h.A, d.h.B);
+  const lo = range ? range[0] : -180, hi = range ? range[1] : 180;
   const frameOf = (deg) => {
     let fr = base;
     for (const st of d.path) fr = rotateFrame(fr, st.e, st.face, st.from === d.fixed && st.face === d.moving ? deg : hingeDeg(st.face, st.from));
@@ -289,9 +295,10 @@ function hingeAngleToward(d, grab2, toScreen, q) {
   };
   const cost = (deg) => { const s = toScreen(toWorld(frameOf(deg), grab2)); return Math.hypot(s.x - q.x, s.y - q.y) + Math.abs(deg - prev) * 0.02; };
   let best = prev, bc = cost(prev);
-  for (let x = -180; x <= 180; x += 2) { const c = cost(x); if (c < bc) { bc = c; best = x; } }
-  for (let x = best - 2; x <= best + 2; x += 0.1) { const c = cost(x); if (c < bc) { bc = c; best = x; } }
-  return Math.max(-180, Math.min(180, best));
+  if (prev < lo || prev > hi) { best = lo; bc = cost(lo); }
+  for (let x = lo; x <= hi; x += 2) { const c = cost(x); if (c < bc) { bc = c; best = x; } }
+  for (let x = best - 2; x <= best + 2; x += 0.1) { if (x < lo || x > hi) continue; const c = cost(x); if (c < bc) { bc = c; best = x; } }
+  return Math.max(lo, Math.min(hi, best));
 }
 // 吸着：0°・±90°・±180° の近く（4° 以内）に吸い付く。Shift で 15° ずつ
 function snapFoldDeg(deg, shift) {
@@ -330,4 +337,33 @@ function hitGrabLine(h, toScreen, q, tolPx = 6) {
     }
   }
   return best;
+}
+
+// ---- 回転ハンドル：オレンジの折り線の両側の面に1つずつ出る「つまみ」 ----
+// つかんだ側の面が、折り線のまわりに起きる（反対側は動かない）。線を探したり、図を傾けたりしなくてよい
+// 戻り値：[{ face, p2（その面の 2D の点）, w（3D の点） }]
+function hingeHandles(h) {
+  const m = vlerp(h.e.a, h.e.b, 0.5);
+  return [h.A, h.B].map((F) => {
+    let n = vsub(faceInnerPoint(F, h.e), m);
+    n = vmul(n, 1 / (vlen(n) || 1));
+    let far = 0;
+    for (const v of polyFromSub(F.subs[0])) far = Math.max(far, (v.x - m.x) * n.x + (v.y - m.y) * n.y);
+    const p2 = vadd(m, vmul(n, Math.max(1, far * 0.6)));
+    return { face: F, p2, w: toWorld(planeOf(F), p2) };
+  });
+}
+function hitFoldHandle(h, toScreen, q, tolPx = 9) {
+  let best = null, bd = tolPx;
+  for (const hd of hingeHandles(h)) { const s = toScreen(hd.w), d = Math.hypot(s.x - q.x, s.y - q.y); if (d < bd) { bd = d; best = hd; } }
+  return best;
+}
+// 折りたたみのデータを控える・戻す（ドラッグが途中で中断されたとき、元の角度・置き方に戻す）
+function snapshotFolds() {
+  return new Map(leaves(doc.layers.flatMap((L) => L.items)).filter((it) => it.fold).map((it) => [it.id, clone(it.fold)]));
+}
+function restoreFolds(snap) {
+  for (const it of leaves(doc.layers.flatMap((L) => L.items))) {
+    if (snap.has(it.id)) it.fold = clone(snap.get(it.id)); else if (it.fold) delete it.fold;
+  }
 }

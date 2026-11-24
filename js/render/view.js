@@ -300,7 +300,16 @@ function drawOverlay() {
   }
   // 折り線（オレンジ）：展開図ならその辺、組み立てた形なら真上から見た線
   const oh = typeof findHinge === 'function' && S.foldHinge && findHinge(S.foldHinge);
-  if (oh) { const [a, b] = planHingePts(oh).map(sp); h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ff8c1a" stroke-width="3" stroke-linecap="round"/>`; }
+  if (oh) {
+    const [a, b] = planHingePts(oh).map(sp);
+    h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ff8c1a" stroke-width="3" stroke-linecap="round"/>`;
+    // ドラッグ中：動く側の面を真上から見た形（点線）。平面図が展開図のままでも、起き方が分かるように
+    const fd = S.drag && S.drag.type === 'foldPlan' ? S.drag : null;
+    if (fd && fd.side) for (const id of fd.side) { const f = findItem(id); if (f) h += `<path d="${planProjD(f.item, sp)}" fill="#2f7bff" fill-opacity="0.12" stroke="#2f7bff" stroke-width="1" stroke-dasharray="4 3"/>`; }
+    // 回転ハンドル：真上から見た位置に出す（面が起きるほど折り線に近づく）
+    h += foldHandlesSvg(oh, (w) => sp(P(w.x, w.y)), S.foldHandleHover, fd ? fd.face : null);
+    if (fd && fd.moved && S.mouseScr) h += `<text x="${S.mouseScr.x + 14}" y="${S.mouseScr.y + 22}" font-size="12" font-weight="700" fill="#fff" stroke="#2f7bff" stroke-width="3" paint-order="stroke">角度 ${r2(fd.deg || 0)}°</text>`;
+  }
   // 整列のキーオブジェクト（太い枠）
   if (S.keyId && !S.hideEdges) {
     const f = findItem(S.keyId);

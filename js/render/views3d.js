@@ -324,12 +324,27 @@ const VB_HANDLES = (b) => {
   return hs;
 };
 // 枠と取っ手を描く（canvas の上の SVG）
+// 回転ハンドル（つまみ）の絵：折り線からつまみへの細い線と丸。マウスが乗ると緑、ドラッグ中は青
+function foldHandlesSvg(oh, sc, hover, active) {
+  const m = sc(toWorld(planeOf(oh.A), vlerp(oh.e.a, oh.e.b, 0.5)));
+  let h = '';
+  for (const hd of hingeHandles(oh)) {
+    const s = sc(hd.w), col = active === hd.face.id ? '#2f7bff' : hover === hd.face.id ? '#2fbf4f' : '#ff8c1a';
+    h += `<line x1="${m.x}" y1="${m.y}" x2="${s.x}" y2="${s.y}" stroke="${col}" stroke-width="1.5" stroke-dasharray="3 2"/>`;
+    h += `<circle cx="${s.x}" cy="${s.y}" r="6" fill="${col}" stroke="#fff" stroke-width="2"/>`;
+  }
+  return h;
+}
 // 折り線（オレンジ）と、つかむ線（緑。ドラッグ中は青）
 function viewFoldSvg(id) {
   let h = '';
   const sc = (w) => localToViewW(id, w);
   const oh = S.foldHinge && findHinge(S.foldHinge);
-  if (oh) { const [a, b] = hingeWorld(oh).map(sc); h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ff8c1a" stroke-width="3" stroke-linecap="round"/>`; }
+  if (oh) {
+    const [a, b] = hingeWorld(oh).map(sc);
+    h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ff8c1a" stroke-width="3" stroke-linecap="round"/>`;
+    h += foldHandlesSvg(oh, sc, V3.handleHover, V3.handleActive);
+  }
   const g = V3.grabLine, f = g && findItem(g.face);
   // 動く側の面を薄く色づけ（ドラッグ前に、どこが動くか分かるように）
   if (oh && f) {
@@ -533,6 +548,13 @@ function translateWorld(items, d) {
     }
   }
 }
+function moveViewXf3dReset(d) {
+  for (const [id, o] of d.snap) {
+    const f = findItem(id); if (!f) continue;
+    const it = f.item; it.subs = clone(o.subs);
+    for (const k of ['plane', 'fold', 'x3d']) { if (o[k]) it[k] = clone(o[k]); else delete it[k]; }
+  }
+}
 function moveViewXf3d(d, q, e) {
   // 元に戻してから動かす
   for (const [id, o] of d.snap) {
@@ -688,15 +710,30 @@ for (const v of VIEWS) {
     // 折りたたみ：オレンジの折り線があるときは、ほかの線（緑）をつかんで折る
     const toScr3 = (w) => localToViewW(v.id, w);
     const oh = S.foldHinge && findHinge(S.foldHinge);
+    // 回転ハンドル（つまみ）：つかんだ側の面が起きる
+    const fh = oh && !e.shiftKey && hitFoldHandle(oh, toScr3, q);
+    if (fh) {
+      const undo = snapshotFolds();
+      const d = startHingeDrag(oh, fh.face);
+      if (!d) { toast('面のつながりが輪になっているので、ここでは折れません'); return; }
+      applyFolds();
+      grab();
+      if (V3.fit) V3.hold = V3.fit;
+      drag = { type: 'fold', d, grab2: fh.p2, s: q, moved: false, undo };
+      V3.handleActive = fh.face.id;
+      renderViews();
+      return;
+    }
     if (oh && !e.shiftKey) {
       const gl = hitGrabLine(oh, toScr3, q);
       if (gl) {
+        const undo = snapshotFolds();
         const d = startHingeDrag(oh, gl.face);
         if (!d) { toast('面のつながりが輪になっているので、この線では折れません'); return; }
         applyFolds();
         grab();
         if (V3.fit) V3.hold = V3.fit;
-        drag = { type: 'fold', d, grab2: gl.mid, gl, s: q, moved: false };
+        drag = { type: 'fold', d, grab2: gl.mid, gl, s: q, moved: false, undo };
         V3.grabLine = { face: gl.face.id, seg: gl.seg, active: true };
         renderViews();
         return;
@@ -763,6 +800,16 @@ for (const v of VIEWS) {
   });
   const end = (e) => {
     if (!drag) return;
+    const cancel = e && e.type === 'pointercancel';
+    if (cancel) {
+      // 途中で中断された（ほかの窓に切り替わった、など）：元に戻して終わる
+      if (drag.type === 'fold' && drag.undo) restoreFolds(drag.undo);
+      if (drag.type === 'vxf' && drag.moved) { if (drag.kind === 'move3d') moveViewXf3dReset(drag); else { restoreFrom(drag.subs); for (const it of drag.sr.items) { const o = drag.x3d.get(it.id); if (o) it.x3d = { ...o }; else delete it.x3d; } } }
+      if (drag.type === 'pen') endViewPen(e, local(e));
+      V3.hold = null; V3.grabLine = null; V3.handleActive = null; showTip(v.id, null, '');
+      drag = null; render(); updateUI(); updateCursor();
+      return;
+    }
     if (drag.type === 'pen') endViewPen(e, local(e));
     if (drag.type === 'hingeOrMove') {   // 動かさずに離した：折り線をオレンジに（もう一度で外す）
       const k = hingeKey(drag.hh.A, drag.hh.B);
@@ -770,7 +817,7 @@ for (const v of VIEWS) {
       V3.grabLine = null;
       render(); updateUI();
     }
-    if (drag.type === 'fold') { V3.hold = null; V3.grabLine = null; showTip(v.id, null, ''); render(); commit(); }
+    if (drag.type === 'fold') { V3.hold = null; V3.grabLine = null; V3.handleActive = null; showTip(v.id, null, ''); render(); commit(); }
     if (drag.type === 'vxf') { endViewXf(drag); showTip(v.id, null, ''); }
     drag = null; updateCursor();
   };
@@ -808,10 +855,12 @@ function hoverView(id, q) {
   $(id).dataset.hover = S.spaceDown || S.tool === 'zoom' || S.tool === 'hand' ? '' : hitViewHandle(id, q) || '';
   // オレンジの折り線があるとき、つかめる線にマウスが乗ったら緑
   const oh = S.foldHinge && !S.spaceDown && SEL_TOOLS.has(S.tool) && findHinge(S.foldHinge);
-  const gl = oh ? hitGrabLine(oh, (w) => localToViewW(id, w), q) : null;
+  const hd = oh ? hitFoldHandle(oh, (w) => localToViewW(id, w), q) : null;
+  if ((hd ? hd.face.id : null) !== (V3.handleHover || null)) { V3.handleHover = hd ? hd.face.id : null; for (const v of VIEWS) drawViewBox(v.id); drawOverlay(); }
+  const gl = oh && !hd ? hitGrabLine(oh, (w) => localToViewW(id, w), q) : null;
   const next = gl ? { face: gl.face.id, seg: gl.seg, view: id } : null;
   if (JSON.stringify(V3.grabLine || null) !== JSON.stringify(next)) { V3.grabLine = next; for (const v of VIEWS) drawViewBox(v.id); }
-  if (gl) $(id).dataset.hover = 'grab';
+  if (gl || hd) $(id).dataset.hover = 'grab';
   updateViewsCursor();
 }
 // ドラッグ中の数値

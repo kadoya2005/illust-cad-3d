@@ -49,12 +49,20 @@ function dragMove(e, p) {
     S.sel = new Map([...d.baseSel].map(([k, v]) => [k, new Set(v)]));
     d.dup = false; d.orig = d.base;
   }
-  for (const [id, subs] of d.orig) {
-    const f = findItem(id);
-    if (!f) continue;
-    f.item.subs = clone(subs);
-    const set = S.sel.get(id);
-    f.item.subs.forEach((sb, s) => sb.nodes.forEach((n, i) => { if (d.nodesOnly && !(set && set.has(key(s, i)))) return; moveNode(n, dx, dy); }));
+  const place = () => {
+    for (const [id, subs] of d.orig) {
+      const f = findItem(id);
+      if (!f) continue;
+      f.item.subs = clone(subs);
+      const set = S.sel.get(id);
+      f.item.subs.forEach((sb, s) => sb.nodes.forEach((n, i) => { if (d.nodesOnly && !(set && set.has(key(s, i)))) return; moveNode(n, dx, dy); }));
+    }
+  };
+  place();
+  // 面の辺がほかの面の辺に近づいたら（8px 以内）、ぴったり重ねる（そのまま離せば折り線になる）
+  if (!e.shiftKey && !d.nodesOnly) {
+    const c = foldEdgeSnap(new Set(d.orig.keys()), 8 / inputScale());
+    if (c) { dx += c.x; dy += c.y; place(); S.snapViz = null; }
   }
   d.dx = dx; d.dy = dy; d.lastP = p;
   renderArt();
@@ -63,6 +71,36 @@ function dragMove(e, p) {
     const moved = new Set(d.orig.keys());
     d.contacts = FOLD_HINGES.filter((h) => moved.has(h.A.id) !== moved.has(h.B.id)).map((h) => h.e);
   }
+}
+// 動かしている面の辺と、ほかの面の辺が、ほぼ一直線に並んで重なっていたら、ぴったり重ねるためのずらし量を返す
+//   辺に直角の向き：ずれをなくす。辺に沿った向き：角どうしが近ければ角も合わせる
+function foldEdgeSnap(moved, tol) {
+  const vdot = (a, b) => a.x * b.x + a.y * b.y;
+  if (typeof isFoldFace === 'undefined') return null;
+  const all = leaves(doc.layers.filter((L) => L.visible !== false).flatMap((L) => L.items)).filter(isFoldFace);
+  const mov = all.filter((it) => moved.has(it.id)), fix = all.filter((it) => !moved.has(it.id) && !it.hidden);
+  if (!mov.length || !fix.length) return null;
+  const fixE = fix.flatMap(foldEdges);
+  let best = null;
+  for (const it of mov) for (const m of foldEdges(it)) for (const f of fixE) {
+    const L = vdist(f.a, f.b), u = vmul(vsub(f.b, f.a), 1 / L), nrm = P(-u.y, u.x);
+    const md = vsub(m.b, m.a), ml = vlen(md);
+    if (Math.abs(md.x * u.y - md.y * u.x) > 0.02 * ml) continue;   // 平行でない（1° くらいまで）
+    const sa = vdot(vsub(m.a, f.a), nrm), sb = vdot(vsub(m.b, f.a), nrm);
+    if (Math.abs(sa) > tol || Math.abs(sb) > tol) continue;
+    const ta = vdot(vsub(m.a, f.a), u), tb = vdot(vsub(m.b, f.a), u);
+    const ov = Math.min(L, Math.max(ta, tb)) - Math.max(0, Math.min(ta, tb));
+    if (ov <= FOLD_MIN_LEN) continue;
+    const dist = Math.abs((sa + sb) / 2);
+    if (best && dist >= best.dist) continue;
+    let corr = vmul(nrm, -(sa + sb) / 2);
+    // 角どうしが近ければ、辺に沿っても合わせる
+    let along = null;
+    for (const t of [ta, tb]) for (const g of [0, L]) if (Math.abs(g - t) < tol && (along === null || Math.abs(g - t) < Math.abs(along))) along = g - t;
+    if (along !== null) corr = vadd(corr, vmul(u, along));
+    best = { dist, corr };
+  }
+  return best && vlen(best.corr) > 1e-9 ? best.corr : null;
 }
 // Alt を押した・離したときに、マウスを動かさなくてもすぐ切り替える
 function refreshMoveDrag(e) {
