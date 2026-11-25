@@ -6,7 +6,16 @@
 
 const X3D_DEFAULT_H = 10;   // 押し出すときの最初の高さ（mm）
 
-const extrudeOf = (it) => (it && !isGroup(it) && it.x3d && it.x3d.h > 0 && flatOnFloor(it) ? it.x3d : null);   // 押し出しは、いまは床に平行なパスだけ
+// 押し出し：床に平行なパスと、傾いた平面のパス（回した立体・正面図や側面図に描いたパス）。折りたたみの面は、折っているあいだは押し出さない
+//   床に平行なもの：z0 は床からの高さ（いままでどおり。plane.o の高さは使わない）
+//   傾いたもの：z0 は、その平面から法線（u×v）の向きへの距離。立体は z0〜z0+h
+const extrudeOf = (it) => (it && !isGroup(it) && it.x3d && it.x3d.h > 0 && (flatOnFloor(it) || !it.fold) ? it.x3d : null);
+// 押し出しの 3D の点：パスの 2D の点 p と、押し出しの向きの位置 z（床なら高さ、傾いたものは z0 からの距離を含めた値）
+function solidPoint(it, p, z) {
+  if (flatOnFloor(it)) return { x: p.x, y: p.y, z };
+  const pl = planeOf(it), w = toWorld(pl, p), n = planeNormal(pl);
+  return { x: w.x + n[0] * z, y: w.y + n[1] * z, z: w.z + n[2] * z };
+}
 // 選んでいるパス（グループの中も）のうち、閉じたサブパスがあるもの
 function selectedProfileLeaves() {
   return leaves(selectedTops().map((t) => t.node)).filter((it) => it.subs.some((sb) => sb.closed && sb.nodes.length >= 2));
@@ -175,7 +184,15 @@ function solidTriangles(it) {
     let outer = up(sh.outer); if (ringArea(outer) < 0) outer.reverse();
     const holes = sh.holes.map(up).map((h) => (ringArea(h) > 0 ? h.reverse() : h));
     const { pts, tris } = triangulateCap(outer, holes);
-    const P3 = (i, z) => [pts[i].x, pts[i].y, z];
+    // 2D（数学の向き）と押し出しの位置 → 3D（[x, 奥行き(上が奥), 高さ]）。
+    // 床ならそのまま。傾いたものは平面に置いて法線の向きへ（向きを保つ回転なので、三角形の表裏はそのまま）
+    const flat = flatOnFloor(it);
+    const T = (q, z) => {
+      if (flat) return [q.x, q.y, z];
+      const w = solidPoint(it, P(q.x, -q.y), z);
+      return [w.x, -w.y, w.z];
+    };
+    const P3 = (i, z) => T(pts[i], z);
     for (const [a, b, c] of tris) {
       out.push([P3(a, z1), P3(b, z1), P3(c, z1)]);   // 上の面（上向き）
       out.push([P3(a, z0), P3(c, z0), P3(b, z0)]);   // 下の面（下向き）
@@ -184,7 +201,7 @@ function solidTriangles(it) {
     for (const r of [outer, ...holes]) {
       for (let i = 0; i < r.length; i++) {
         const a = r[i], b = r[(i + 1) % r.length];
-        const a0 = [a.x, a.y, z0], b0 = [b.x, b.y, z0], a1 = [a.x, a.y, z1], b1 = [b.x, b.y, z1];
+        const a0 = T(a, z0), b0 = T(b, z0), a1 = T(a, z1), b1 = T(b, z1);
         out.push([a0, b0, b1], [a0, b1, a1]);
       }
     }

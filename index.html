@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>イラレCAD</title>
-<link rel="stylesheet" href="style.css?v=34">
+<link rel="stylesheet" href="style.css?v=36">
 </head>
 <body>
 <header id="topbar">
@@ -81,6 +81,8 @@
 <aside id="views" title="正面図・側面図（平面図で押し出したパスが、ここに立体で出ます）">
   <div id="viewFront" class="view3d"><canvas></canvas><div class="vlabel">正面図</div><svg class="vover" xmlns="http://www.w3.org/2000/svg"></svg><div class="vhint"></div><div class="vtip" hidden></div></div>
   <div id="viewSide" class="view3d"><canvas></canvas><div class="vlabel">側面図</div><svg class="vover" xmlns="http://www.w3.org/2000/svg"></svg><div class="vhint"></div><div class="vtip" hidden></div></div>
+  <div id="splitV" class="split v" title="ドラッグで平面図と正面図・側面図の幅を変える（ダブルクリックで元に戻す）"></div>
+  <div id="splitH" class="split h" title="ドラッグで正面図と側面図の高さを変える（ダブルクリックで元に戻す）"></div>
 </aside>
 
 <aside id="panels">
@@ -232,40 +234,41 @@
   ui     … マウス・キーボード・パネル・ダイアログ
   io     … ファイルとクリップボード
 -->
-<script src="js/vendor/paper-core.min.js?v=34"></script>
-<script src="js/vendor/clipper.js?v=34"></script>
-<script src="js/vendor/three.min.js?v=34"></script>
-<script src="js/core/geom.js?v=34"></script>
-<script src="js/core/config.js?v=34"></script>
-<script src="js/core/plane.js?v=34"></script>
-<script src="js/core/state.js?v=34"></script>
-<script src="js/core/document.js?v=34"></script>
-<script src="js/core/selection.js?v=34"></script>
-<script src="js/core/history.js?v=34"></script>
-<script src="js/core/prefs.js?v=34"></script>
-<script src="js/core/snap.js?v=34"></script>
-<script src="js/core/pathfinder.js?v=34"></script>
-<script src="js/core/offset.js?v=34"></script>
-<script src="js/core/solids.js?v=34"></script>
-<script src="js/core/fold.js?v=34"></script>
-<script src="js/io/svgio.js?v=34"></script>
-<script src="js/render/view.js?v=34"></script>
-<script src="js/render/hittest.js?v=34"></script>
-<script src="js/render/views3d.js?v=34"></script>
-<script src="js/core/edit.js?v=34"></script>
-<script src="js/tools/drag.js?v=34"></script>
-<script src="js/tools/transform.js?v=34"></script>
-<script src="js/tools/shapes.js?v=34"></script>
-<script src="js/tools/tools.js?v=34"></script>
-<script src="js/ui/dialogs.js?v=34"></script>
-<script src="js/ui/mouse.js?v=34"></script>
-<script src="js/ui/keyboard.js?v=34"></script>
-<script src="js/io/clipboard.js?v=34"></script>
-<script src="js/io/files.js?v=34"></script>
-<script src="js/io/stl.js?v=34"></script>
-<script src="js/ui/panels.js?v=34"></script>
-<script src="js/ui/help.js?v=34"></script>
-<script src="js/app.js?v=34"></script>
-<script src="js/dev/tests.js?v=34"></script>
+<script src="js/vendor/paper-core.min.js?v=36"></script>
+<script src="js/vendor/clipper.js?v=36"></script>
+<script src="js/vendor/three.min.js?v=36"></script>
+<script src="js/core/geom.js?v=36"></script>
+<script src="js/core/config.js?v=36"></script>
+<script src="js/core/plane.js?v=36"></script>
+<script src="js/core/state.js?v=36"></script>
+<script src="js/core/document.js?v=36"></script>
+<script src="js/core/selection.js?v=36"></script>
+<script src="js/core/history.js?v=36"></script>
+<script src="js/core/prefs.js?v=36"></script>
+<script src="js/core/snap.js?v=36"></script>
+<script src="js/core/pathfinder.js?v=36"></script>
+<script src="js/core/offset.js?v=36"></script>
+<script src="js/core/solids.js?v=36"></script>
+<script src="js/core/fold.js?v=36"></script>
+<script src="js/io/svgio.js?v=36"></script>
+<script src="js/render/view.js?v=36"></script>
+<script src="js/render/hittest.js?v=36"></script>
+<script src="js/render/views3d.js?v=36"></script>
+<script src="js/core/edit.js?v=36"></script>
+<script src="js/tools/drag.js?v=36"></script>
+<script src="js/tools/transform.js?v=36"></script>
+<script src="js/tools/shapes.js?v=36"></script>
+<script src="js/tools/tools.js?v=36"></script>
+<script src="js/ui/dialogs.js?v=36"></script>
+<script src="js/ui/mouse.js?v=36"></script>
+<script src="js/ui/keyboard.js?v=36"></script>
+<script src="js/io/clipboard.js?v=36"></script>
+<script src="js/io/files.js?v=36"></script>
+<script src="js/io/stl.js?v=36"></script>
+<script src="js/ui/panels.js?v=36"></script>
+<script src="js/ui/help.js?v=36"></script>
+<script src="js/ui/split.js?v=36"></script>
+<script src="js/app.js?v=36"></script>
+<script src="js/dev/tests.js?v=36"></script>
 </body>
 </html>

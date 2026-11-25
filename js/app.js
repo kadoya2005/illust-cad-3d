@@ -18,6 +18,7 @@ function init() {
   const vm = (document.querySelector('script[src*="app.js"]') || {}).src?.match(/[?&]v=(\d+)/);
   if (vm) $('appVer').textContent = 'ver ' + vm[1];
   loadPrefs();
+  initSplit();
   const saved = loadAutosave();
   if (saved) { doc = saved.doc; if (saved.name) S.fileName = saved.name; }
   normalizeDoc(); ensureActiveLayer(); resetHistory();

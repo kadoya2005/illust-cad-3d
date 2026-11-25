@@ -119,19 +119,35 @@ function worldRange(items) {
       const za = x ? x.z0 : z, zb = x ? x.z0 + x.h : z;
       add({ x: bb.x, y: bb.y, z: za }); add({ x: bb.x + bb.w, y: bb.y + bb.h, z: zb });
     } else {
-      for (const sb of it.subs) if (sb.nodes.length) for (const w of subWorldPts(it, sb)) add(w);
+      const x = typeof extrudeOf === 'function' ? extrudeOf(it) : null;
+      const n = planeNormal(planeOf(it));
+      for (const sb of it.subs) if (sb.nodes.length) for (const w of subWorldPts(it, sb)) {
+        if (!x) { add(w); continue; }
+        // 傾いた押し出し：底と上の面の両方
+        for (const z of [x.z0, x.z0 + x.h]) add({ x: w.x + n[0] * z, y: w.y + n[1] * z, z: w.z + n[2] * z });
+      }
     }
   }
   return r;
 }
 
 // 平面図に出すための形：真上から見た 3D の線（床に平行でないパスの「参考」の表示）
+// 傾いた押し出しは、底と上の面の輪郭と、角どうしを結ぶ線
 function planProjD(it, sp) {
   let d = '';
+  const x = typeof extrudeOf === 'function' ? extrudeOf(it) : null;
+  const n = planeNormal(planeOf(it));
+  const off = (w, z) => ({ x: w.x + n[0] * z, y: w.y + n[1] * z });
+  const to = (w) => (sp ? sp(P(w.x, w.y)) : P(w.x, w.y));
+  const line = (pts, closed) => pts.map((p, i) => `${i ? 'L' : 'M'}${fmt(p.x)} ${fmt(p.y)}`).join('') + (closed ? 'Z' : '');
   for (const sb of it.subs) {
     if (sb.nodes.length < 2) continue;
-    const pts = subWorldPts(it, sb).map((w) => (sp ? sp(P(w.x, w.y)) : P(w.x, w.y)));
-    d += pts.map((p, i) => `${i ? 'L' : 'M'}${fmt(p.x)} ${fmt(p.y)}`).join('') + (sb.closed ? 'Z' : '');
+    const ws = subWorldPts(it, sb);
+    if (!x) { d += line(ws.map(to), sb.closed); continue; }
+    const a = ws.map((w) => to(off(w, x.z0))), b = ws.map((w) => to(off(w, x.z0 + x.h)));
+    d += line(a, sb.closed) + line(b, sb.closed);
+    // 角（アンカーポイント）どうしを結ぶ
+    for (const nd of sb.nodes) { const w = toWorld(planeOf(it), P(nd.x, nd.y)); d += line([to(off(w, x.z0)), to(off(w, x.z0 + x.h))], false); }
   }
   return d;
 }

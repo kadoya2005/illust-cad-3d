@@ -52,7 +52,7 @@ function initViews3d() {
 
 // 押し出し1つの形（三角形と輪郭線）。形が変わったときだけ作り直す
 function solidMesh(it) {
-  const key = JSON.stringify(it.subs) + it.rule + it.x3d.z0 + ',' + it.x3d.h;
+  const key = JSON.stringify(it.subs) + it.rule + it.x3d.z0 + ',' + it.x3d.h + JSON.stringify(it.plane || null);   // 置き場所（回したとき）も
   let m = V3.meshes.get(it.id);
   if (m && m.key === key) return m;
   if (m) { if (m.group.parent) m.group.parent.remove(m.group); disposeMesh(m); }   // 古いものを scene から外してから捨てる（残すと跡のように見える）
@@ -486,10 +486,89 @@ function hitViewHandle(id, q) {
 }
 const insideViewBox = (id, q) => { const b = viewBox(id); return !!b && q.x >= b.x0 - 3 && q.x <= b.x1 + 3 && q.y >= b.y0 - 3 && q.y <= b.y1 + 3; };
 
+// ---- 正面図・側面図で回す（イラレのバウンディングボックスと同じ：角の少し外をドラッグ） ----
+// 正面図は奥行きの軸、側面図は左右の軸のまわりに回る。中心は枠の真ん中。Shift で 45° ずつ
+// 回すのは、パスを置く平面（plane の o・u・v）だけ。2D の形と押し出しの高さはそのまま
+// 折りたたみの面（折った箱）は、まだ回さない
+const viewRight = (id) => (id === 'viewFront' ? [1, 0, 0] : [0, -1, 0]);   // 画面の右が 3D のどの向きか（上は z）
+const canRotate = (items) => items.length && !items.some((it) => it.fold || (typeof FOLD_SHOW !== 'undefined' && FOLD_SHOW.has(it.id)));
+function hitViewRotate(id, q) {
+  const b = viewBox(id);
+  if (!b || !editable(id) || !canRotate(b.items)) return null;
+  if (q.x > b.x0 && q.x < b.x1 && q.y > b.y0 && q.y < b.y1) return null;
+  const cs = { nw: [b.x0, b.y0], ne: [b.x1, b.y0], se: [b.x1, b.y1], sw: [b.x0, b.y1] };
+  for (const [k, [x, y]] of Object.entries(cs)) if (Math.hypot(x - q.x, y - q.y) <= 18) return k;
+  return null;
+}
+// 3D の向き w を、画面の右 H と上 z の面の中で φ（反時計回り、ラジアン）回す
+function rotInView(w, H, ph) {
+  const h = v3dot(w, H), z = w[2];
+  const rest = v3sub(w, v3add(v3mul(H, h), [0, 0, z]));
+  const c = Math.cos(ph), sn = Math.sin(ph);
+  return v3add(rest, v3add(v3mul(H, h * c - z * sn), [0, 0, h * sn + z * c]));
+}
+// 0・±1 にごく近い値はそろえる（90° ずつ回して元に戻したとき、ぴったり床に戻るように）
+const tidy = (a) => a.map((x) => (Math.abs(x) < 1e-12 ? 0 : Math.abs(x - 1) < 1e-12 ? 1 : Math.abs(x + 1) < 1e-12 ? -1 : x));
+// パス1つを、平面の形（plane と、法線の向きの z0）にする。床の押し出しは z0 が床からの高さなので、それを平面の高さに移す
+function toPlaneForm(it) {
+  if (!flatOnFloor(it)) return;
+  const pl = planeOf(it);
+  const o = [pl.o[0], pl.o[1], pl.o[2]];
+  if (it.x3d) { o[2] = it.x3d.z0; it.x3d = { ...it.x3d, z0: 0 }; }
+  it.plane = { o, u: [...pl.u], v: [...pl.v] };
+}
+// 回したあと、床に平行な向きにぴったり戻っていたら、いつもの床のパスの形に戻す
+function fromPlaneForm(it) {
+  const pl = it.plane;
+  if (!pl) return;
+  const top = v3len(v3sub(pl.u, [1, 0, 0])) < 1e-9 && v3len(v3sub(pl.v, [0, 1, 0])) < 1e-9;
+  if (!top) return;
+  const [ox, oy, oz] = pl.o;
+  if (ox || oy) mapItem(it, (p) => P(p.x + ox, p.y + oy));
+  if (it.x3d) { it.x3d = { ...it.x3d, z0: oz + it.x3d.z0 }; delete it.plane; }
+  else if (Math.abs(oz) > 1e-9) it.plane = planeTop(oz);
+  else delete it.plane;
+}
+// 選んだもの（items）を、中心 c のまわりに、その図の画面で φ 回す
+function rotateItems3d(items, id, c, ph) {
+  const H = viewRight(id);
+  for (const it of items) {
+    toPlaneForm(it);
+    const pl = it.plane;
+    const o = v3add(c, rotInView(v3sub(pl.o, c), H, ph));
+    let u = rotInView(pl.u, H, ph), v = rotInView(pl.v, H, ph);
+    // u・v を長さ 1 で直角にそろえ直す
+    u = v3mul(u, 1 / v3len(u));
+    v = v3sub(v, v3mul(u, v3dot(v, u))); v = v3mul(v, 1 / v3len(v));
+    it.plane = { o: tidy(o.map((x) => Math.round(x * 1e9) / 1e9)), u: tidy(u), v: tidy(v) };
+    fromPlaneForm(it);
+  }
+}
+function startViewRotate(id, corner, q) {
+  const sr = selRange();
+  if (!sr || !canRotate(sr.items)) return null;
+  if (V3.fit) V3.hold = V3.fit;
+  const c = [sr.bb.x + sr.bb.w / 2, sr.bb.y + sr.bb.h / 2, (sr.zMin + sr.zMax) / 2];
+  const b = viewBox(id);
+  return { type: 'vxf', kind: 'rotate', view: id, corner, s: q, sr, moved: false, c, sc: P((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2),
+    snap: new Map(sr.items.map((it) => [it.id, clone({ subs: it.subs, plane: it.plane || null, fold: it.fold || null, x3d: it.x3d || null })])) };
+}
+function rotateViewXf(d, q, e) {
+  moveViewXf3dReset(d);   // ドラッグを始めたときの形から毎回計算する（回すたびに誤差がたまらない）
+  // 画面は y が下向きなので、上向きにして角度をとる（反時計回りが +）
+  const a0 = Math.atan2(-(d.s.y - d.sc.y), d.s.x - d.sc.x), a1 = Math.atan2(-(q.y - d.sc.y), q.x - d.sc.x);
+  let deg = ((a1 - a0) * 180) / Math.PI;
+  deg = ((deg + 540) % 360) - 180;
+  if (e.shiftKey) deg = Math.round(deg / 45) * 45;
+  rotateItems3d(d.sr.items, d.view, d.c, (deg * Math.PI) / 180);
+  d.tip = `回転 ${r2(deg)}°`;
+  render(); updateUI();
+}
+
 // 吸着する高さ：ほかの立体の上と下、床（0）
 function snapHeights(exclude) {
   const hs = [0];
-  for (const it of visibleSolids()) if (!exclude.has(it.id)) hs.push(it.x3d.z0, it.x3d.z0 + it.x3d.h);
+  for (const it of visibleSolids()) if (!exclude.has(it.id) && flatOnFloor(it)) hs.push(it.x3d.z0, it.x3d.z0 + it.x3d.h);
   return hs;
 }
 function snapZ(d, edges, dz, e) {
@@ -584,6 +663,7 @@ function moveViewXf(d, q, e) {
   if (!d.moved && Math.hypot(dx, dy) < 3) return;
   d.moved = true;
   if (d.kind === 'move3d') { moveViewXf3d(d, q, e); return; }
+  if (d.kind === 'rotate') { rotateViewXf(d, q, e); return; }
   const sc = V3.scale, ax = hAxis(d.view), sg = hSign(d.view);
   const { bb, zMin, zMax, items } = d.sr;
   restoreFrom(d.subs);
@@ -707,6 +787,9 @@ for (const v of VIEWS) {
     // 取っ手：伸び縮み
     const hd = !e.shiftKey && hitViewHandle(v.id, q);
     if (hd) { grab(); drag = startViewXf(v.id, 'scale', hd, q); return; }
+    // 枠の角の少し外：回す
+    const rz = !e.shiftKey && SEL_TOOLS.has(effectiveTool(e)) && hitViewRotate(v.id, q);
+    if (rz) { grab(); drag = startViewRotate(v.id, rz, q); return; }
     // 折りたたみ：オレンジの折り線があるときは、ほかの線（緑）をつかんで折る
     const toScr3 = (w) => localToViewW(v.id, w);
     const oh = S.foldHinge && findHinge(S.foldHinge);
@@ -804,7 +887,7 @@ for (const v of VIEWS) {
     if (cancel) {
       // 途中で中断された（ほかの窓に切り替わった、など）：元に戻して終わる
       if (drag.type === 'fold' && drag.undo) restoreFolds(drag.undo);
-      if (drag.type === 'vxf' && drag.moved) { if (drag.kind === 'move3d') moveViewXf3dReset(drag); else { restoreFrom(drag.subs); for (const it of drag.sr.items) { const o = drag.x3d.get(it.id); if (o) it.x3d = { ...o }; else delete it.x3d; } } }
+      if (drag.type === 'vxf' && drag.moved) { if (drag.kind === 'move3d' || drag.kind === 'rotate') moveViewXf3dReset(drag); else { restoreFrom(drag.subs); for (const it of drag.sr.items) { const o = drag.x3d.get(it.id); if (o) it.x3d = { ...o }; else delete it.x3d; } } }
       if (drag.type === 'pen') endViewPen(e, local(e));
       V3.hold = null; V3.grabLine = null; V3.handleActive = null; showTip(v.id, null, '');
       drag = null; render(); updateUI(); updateCursor();
@@ -847,12 +930,14 @@ function updateViewsCursor() {
     el.style.cursor = zoom ? (S.keys.alt ? 'zoom-out' : 'zoom-in')
       : S.spaceDown ? (S.keys.shift ? ROTATE_CURSORS.ne : 'grab')
       : S.tool === 'hand' ? 'grab'
-      : hv === 'grab' ? 'grab' : HANDLE_CURSORS[hv] || (S.tool === 'pen' && !S.keys.ctrl ? 'crosshair' : SELECT_CURSOR);
+      : hv === 'grab' ? 'grab' : hv && hv.startsWith('rot-') ? ROTATE_CURSORS[hv.slice(4)] : HANDLE_CURSORS[hv] || (S.tool === 'pen' && !S.keys.ctrl ? 'crosshair' : SELECT_CURSOR);
   }
 }
 function hoverView(id, q) {
   if (!V3.ok) return;
-  $(id).dataset.hover = S.spaceDown || S.tool === 'zoom' || S.tool === 'hand' ? '' : hitViewHandle(id, q) || '';
+  const busy = S.spaceDown || S.tool === 'zoom' || S.tool === 'hand';
+  const rz = busy || !SEL_TOOLS.has(S.tool) ? null : !hitViewHandle(id, q) && hitViewRotate(id, q);
+  $(id).dataset.hover = busy ? '' : hitViewHandle(id, q) || (rz ? 'rot-' + rz : '');
   // オレンジの折り線があるとき、つかめる線にマウスが乗ったら緑
   const oh = S.foldHinge && !S.spaceDown && SEL_TOOLS.has(S.tool) && findHinge(S.foldHinge);
   const hd = oh ? hitFoldHandle(oh, (w) => localToViewW(id, w), q) : null;

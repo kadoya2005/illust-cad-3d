@@ -140,6 +140,34 @@
       restoreFolds(snap); render();
       return near(W('lid', P(90, 60)).z, 30);
     }],
+    ['立体を正面図で 90° ずつ 4 回まわすと、ぴったり元に戻る', () => {
+      useDoc([sq('box', 90, 120, 30, 30, { x3d: { z0: 5, h: 10 } })]);
+      const before = JSON.stringify({ subs: F('box').subs, x3d: F('box').x3d });
+      for (let i = 0; i < 4; i++) rotateItems3d([F('box')], 'viewFront', [105, 135, 10], Math.PI / 2);
+      return !F('box').plane && JSON.stringify({ subs: F('box').subs, x3d: F('box').x3d }) === before;
+    }],
+    ['正面図で 90° まわした立体：向き・位置・体積・STL の面の向きが正しい', () => {
+      useDoc([sq('box', 90, 120, 30, 30, { x3d: { z0: 5, h: 10 } })]);
+      const vol = (tris) => tris.reduce((a, [p, q, r]) => a + v3dot(p, v3cross(q, r)) / 6, 0);
+      const v0 = vol(solidTriangles(F('box')));
+      rotateItems3d([F('box')], 'viewFront', [105, 135, 10], Math.PI / 2);
+      const r = worldRange([F('box')]), tris = solidTriangles(F('box'));
+      const xs = tris.flat().map((p) => p[0]), zs = tris.flat().map((p) => p[2]);
+      // 幅 30・高さ 10 → 幅 10・高さ 30。中心 (105, 10) のまま
+      return near(r.x0, 100) && near(r.x1, 110) && near(r.z0, -5) && near(r.z1, 25) && near(r.y0, 120) && near(r.y1, 150)
+        && near(Math.min(...xs), 100) && near(Math.max(...zs), 25) && tris.length === 12 && near(v0, 9000) && near(vol(tris), 9000);
+    }],
+    ['側面図で 30° まわしても、体積と面の向きはそのまま。もう一度 -30° で元に戻る', () => {
+      useDoc([sq('box', 90, 120, 30, 20, { x3d: { z0: 0, h: 10 } })]);
+      const vol = (tris) => tris.reduce((a, [p, q, r]) => a + v3dot(p, v3cross(q, r)) / 6, 0);
+      const before = JSON.stringify({ subs: F('box').subs, x3d: F('box').x3d });
+      rotateItems3d([F('box')], 'viewSide', [105, 130, 5], Math.PI / 6);
+      const ok1 = !!F('box').plane && near(vol(solidTriangles(F('box'))), 6000);
+      rotateItems3d([F('box')], 'viewSide', [105, 130, 5], -Math.PI / 6);
+      const after = JSON.stringify({ subs: F('box').subs, x3d: F('box').x3d });
+      return ok1 && !F('box').plane && maxDiff([F('box').subs[0].nodes.map((n) => [n.x, n.y, 0])], [JSON.parse(before).subs[0].nodes.map((n) => [n.x, n.y, 0])]) < 1e-6
+        && near(F('box').x3d.z0, 0, 1e-6);
+    }],
   ];
 
   function run() {
