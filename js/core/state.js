@@ -34,6 +34,7 @@ const S = {
   keyStep: 0.1,              // 矢印キーで動く量（mm）。Ctrl+K で変更
   hideEdges: false,          // Ctrl+H：選択の線とアンカーを隠す
   dlgLast: {},
+  roundR: 4.23,              // 角丸長方形ツールの角丸の半径（mm。イラレの初期値 12pt と同じ）
   segSel: null,              // ダイレクト選択でつかんだ線（セグメント）{ id, s, seg }
   keyId: null,               // 整列のキーオブジェクト（選択中のまとまりの ID）
   alignTo: 'selection',      // 整列の基準：'selection' | 'key' | 'artboard'

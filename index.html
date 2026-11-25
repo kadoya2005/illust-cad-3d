@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>イラレCAD</title>
-<link rel="stylesheet" href="style.css?v=36">
+<link rel="stylesheet" href="style.css?v=37">
 </head>
 <body>
 <header id="topbar">
@@ -41,7 +41,7 @@
   <button data-tool="deleteAnchor" title="アンカーポイントの削除ツール (-)"><svg viewBox="0 0 20 20"><path d="M8 3l4 6.5-2.4 5H6.4L4 9.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M11 16h6" stroke="currentColor" stroke-width="1.6"/></svg></button>
   <button data-tool="convert" title="アンカーポイントツール (Shift+C)"><svg viewBox="0 0 20 20"><path d="M3 15L10 5l7 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="8.5" y="3.5" width="3" height="3" fill="currentColor"/></svg></button>
   <div class="tsep"></div>
-  <button data-tool="rect" title="長方形ツール (M)"><svg viewBox="0 0 20 20"><rect x="3.5" y="5" width="13" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+  <button data-tool="rect" data-group="rect" class="grp" title="長方形ツール (M)　長押しでほかのツール"><svg viewBox="0 0 20 20"><rect x="3.5" y="5" width="13" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
   <button data-tool="ellipse" title="楕円形ツール (L)"><svg viewBox="0 0 20 20"><ellipse cx="10" cy="10" rx="6.5" ry="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
   <button data-tool="line" title="直線ツール (\)"><svg viewBox="0 0 20 20"><path d="M4 16L16 4" stroke="currentColor" stroke-width="1.6"/></svg></button>
   <div class="tsep"></div>
@@ -234,41 +234,41 @@
   ui     … マウス・キーボード・パネル・ダイアログ
   io     … ファイルとクリップボード
 -->
-<script src="js/vendor/paper-core.min.js?v=36"></script>
-<script src="js/vendor/clipper.js?v=36"></script>
-<script src="js/vendor/three.min.js?v=36"></script>
-<script src="js/core/geom.js?v=36"></script>
-<script src="js/core/config.js?v=36"></script>
-<script src="js/core/plane.js?v=36"></script>
-<script src="js/core/state.js?v=36"></script>
-<script src="js/core/document.js?v=36"></script>
-<script src="js/core/selection.js?v=36"></script>
-<script src="js/core/history.js?v=36"></script>
-<script src="js/core/prefs.js?v=36"></script>
-<script src="js/core/snap.js?v=36"></script>
-<script src="js/core/pathfinder.js?v=36"></script>
-<script src="js/core/offset.js?v=36"></script>
-<script src="js/core/solids.js?v=36"></script>
-<script src="js/core/fold.js?v=36"></script>
-<script src="js/io/svgio.js?v=36"></script>
-<script src="js/render/view.js?v=36"></script>
-<script src="js/render/hittest.js?v=36"></script>
-<script src="js/render/views3d.js?v=36"></script>
-<script src="js/core/edit.js?v=36"></script>
-<script src="js/tools/drag.js?v=36"></script>
-<script src="js/tools/transform.js?v=36"></script>
-<script src="js/tools/shapes.js?v=36"></script>
-<script src="js/tools/tools.js?v=36"></script>
-<script src="js/ui/dialogs.js?v=36"></script>
-<script src="js/ui/mouse.js?v=36"></script>
-<script src="js/ui/keyboard.js?v=36"></script>
-<script src="js/io/clipboard.js?v=36"></script>
-<script src="js/io/files.js?v=36"></script>
-<script src="js/io/stl.js?v=36"></script>
-<script src="js/ui/panels.js?v=36"></script>
-<script src="js/ui/help.js?v=36"></script>
-<script src="js/ui/split.js?v=36"></script>
-<script src="js/app.js?v=36"></script>
-<script src="js/dev/tests.js?v=36"></script>
+<script src="js/vendor/paper-core.min.js?v=37"></script>
+<script src="js/vendor/clipper.js?v=37"></script>
+<script src="js/vendor/three.min.js?v=37"></script>
+<script src="js/core/geom.js?v=37"></script>
+<script src="js/core/config.js?v=37"></script>
+<script src="js/core/plane.js?v=37"></script>
+<script src="js/core/state.js?v=37"></script>
+<script src="js/core/document.js?v=37"></script>
+<script src="js/core/selection.js?v=37"></script>
+<script src="js/core/history.js?v=37"></script>
+<script src="js/core/prefs.js?v=37"></script>
+<script src="js/core/snap.js?v=37"></script>
+<script src="js/core/pathfinder.js?v=37"></script>
+<script src="js/core/offset.js?v=37"></script>
+<script src="js/core/solids.js?v=37"></script>
+<script src="js/core/fold.js?v=37"></script>
+<script src="js/io/svgio.js?v=37"></script>
+<script src="js/render/view.js?v=37"></script>
+<script src="js/render/hittest.js?v=37"></script>
+<script src="js/render/views3d.js?v=37"></script>
+<script src="js/core/edit.js?v=37"></script>
+<script src="js/tools/drag.js?v=37"></script>
+<script src="js/tools/transform.js?v=37"></script>
+<script src="js/tools/shapes.js?v=37"></script>
+<script src="js/tools/tools.js?v=37"></script>
+<script src="js/ui/dialogs.js?v=37"></script>
+<script src="js/ui/mouse.js?v=37"></script>
+<script src="js/ui/keyboard.js?v=37"></script>
+<script src="js/io/clipboard.js?v=37"></script>
+<script src="js/io/files.js?v=37"></script>
+<script src="js/io/stl.js?v=37"></script>
+<script src="js/ui/panels.js?v=37"></script>
+<script src="js/ui/help.js?v=37"></script>
+<script src="js/ui/split.js?v=37"></script>
+<script src="js/app.js?v=37"></script>
+<script src="js/dev/tests.js?v=37"></script>
 </body>
 </html>

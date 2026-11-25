@@ -24,7 +24,7 @@ function shapeTool(kind) {
     down(e, p) {
       if (!layerWritable(activeLayerObj())) { toast('ロック中または非表示のレイヤーには描けません'); return; }
       const cands = buildCands();
-      S.drag = { type: 'shape', start: snapPoint(p, cands).p, moved: false, id: null, cands };
+      S.drag = { type: 'shape', kind, start: snapPoint(p, cands).p, moved: false, id: null, cands };
     },
     move(e, p) {
       const d = S.drag;
@@ -32,10 +32,8 @@ function shapeTool(kind) {
       d.moved = true;
       S.snapViz = null;
       if (!e.shiftKey) { const sn = snapPoint(p, d.cands); p = sn.p; S.snapViz = sn.viz; }
-      const subs = [shapeFromDrag(kind, d.start, p, e.shiftKey, e.altKey)];
-      if (!d.id) { const it = newItem(subs, kind === 'line'); activeLayerObj().items.push(it); d.id = it.id; selItem(it, false); }
-      else { const f = findItem(d.id); if (f) f.item.subs = subs; }
-      renderArt();
+      d.last = { p, shift: e.shiftKey, alt: e.altKey };
+      redrawShape(d);
     },
     up(e) {
       const d = S.drag;
@@ -45,6 +43,33 @@ function shapeTool(kind) {
       setTimeout(() => shapeDialog(kind, start, alt), 0);
     },
   };
+}
+function redrawShape(d) {
+  const { p, shift, alt } = d.last;
+  const subs = [shapeFromDrag(d.kind, d.start, p, shift, alt)];
+  if (!d.id) { const it = newItem(subs, d.kind === 'line'); activeLayerObj().items.push(it); d.id = it.id; selItem(it, false); }
+  else { const f = findItem(d.id); if (f) f.item.subs = subs; }
+  renderArt();
+}
+// 角丸長方形：半径を幅・高さの半分までにおさえる。0 なら普通の長方形
+function roundRectFit(x, y, w, h, r) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  return rr > 1e-6 ? roundRectSub(x, y, w, h, rr, rr) : rectSub(x, y, x + w, y + h);
+}
+// 角丸長方形をドラッグ中の矢印キー（イラレと同じ）：↑ 大きく、↓ 小さく、← 角なし、→ いちばん丸く
+function roundRectKey(k, sh) {
+  const d = S.drag;
+  if (!d || d.type !== 'shape' || d.kind !== 'roundRect') return false;
+  const st = sh ? 2 : 0.5;
+  if (k === 'ArrowUp') S.roundR += st;
+  else if (k === 'ArrowDown') S.roundR = Math.max(0, S.roundR - st);
+  else if (k === 'ArrowLeft') S.roundR = 0;
+  else if (k === 'ArrowRight') { if (d.last) { const a = d.start, b = d.last.p; S.roundR = Math.min(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) * (d.last.alt ? 1 : 0.5); } }
+  else return false;
+  S.roundR = Math.round(S.roundR * 100) / 100;
+  if (d.last) { d.moved = true; redrawShape(d); }
+  toast(`角丸の半径 ${fmt(S.roundR)} mm`);
+  return true;
 }
 function shapeFromDrag(kind, a, b, shift, alt) {
   if (kind === 'line') {
@@ -56,6 +81,7 @@ function shapeFromDrag(kind, a, b, shift, alt) {
   if (shift) { const m = Math.max(Math.abs(dx), Math.abs(dy)); dx = Math.sign(dx || 1) * m; dy = Math.sign(dy || 1) * m; }
   const x0 = alt ? a.x - dx : a.x, y0 = alt ? a.y - dy : a.y, x1 = a.x + dx, y1 = a.y + dy;
   const L = Math.min(x0, x1), R = Math.max(x0, x1), T = Math.min(y0, y1), B = Math.max(y0, y1);
+  if (kind === 'roundRect') return roundRectFit(L, T, R - L, B - T, S.roundR);
   return kind === 'rect' ? rectSub(L, T, R, B) : ellipseSub((L + R) / 2, (T + B) / 2, (R - L) / 2, (B - T) / 2);
 }
 // 画面をクリックしたとき：数値で作る（イラレと同じ。移動などと同じ画面で、プレビューもできる）
@@ -63,6 +89,7 @@ function shapeFromDrag(kind, a, b, shift, alt) {
 //   直線：長さ・角度
 function shapeDialog(kind, p, alt) {
   const isLine = kind === 'line';
+  const isRR = kind === 'roundRect';
   const last = S.dlgLast[kind] || (isLine ? { len: 30, ang: 0 } : { w: 30, h: 30, t: 0 });
   const make = (v) => {
     if (isLine) {
@@ -72,13 +99,15 @@ function shapeDialog(kind, p, alt) {
     }
     if (!(v.w > 0) || !(v.h > 0)) return null;
     const x0 = alt ? p.x - v.w / 2 : p.x, y0 = alt ? p.y - v.h / 2 : p.y;
+    if (isRR) return roundRectFit(x0, y0, v.w, v.h, v.r > 0 ? v.r : 0);
     return kind === 'rect' ? rectSub(x0, y0, x0 + v.w, y0 + v.h) : ellipseSub(x0 + v.w / 2, y0 + v.h / 2, v.w / 2, v.h / 2);
   };
   openDialog({
-    title: isLine ? '直線' : kind === 'rect' ? '長方形' : '楕円',
+    title: isLine ? '直線' : kind === 'rect' ? '長方形' : isRR ? '角丸長方形' : '楕円',
     fields: isLine
       ? [{ id: 'len', label: '長さ', value: fmt(last.len), unit: 'mm' }, { id: 'ang', label: '角度', value: fmt(last.ang), unit: '°（反時計回り）' }]
       : [{ id: 'w', label: '幅', value: fmt(last.w), unit: 'mm' }, { id: 'h', label: '高さ', value: fmt(last.h), unit: 'mm' },
+        ...(isRR ? [{ id: 'r', label: '角丸の半径', value: fmt(S.roundR), unit: 'mm' }] : []),
         { id: 't', label: '厚み', value: last.t ? fmt(last.t) : '', unit: 'mm（空欄なら平らなパス）' }],
     copy: false,
     apply: (v, copy, pv) => {
@@ -89,6 +118,7 @@ function shapeDialog(kind, p, alt) {
       activeLayerObj().items.push(it);
       selItem(it, false);
       if (pv) return;
+      if (isRR && v.r >= 0) S.roundR = v.r;
       S.dlgLast[kind] = isLine ? { len: v.len, ang: v.ang } : { w: v.w, h: v.h, t: v.t > 0 ? v.t : 0 };
       render(); commit();
     },

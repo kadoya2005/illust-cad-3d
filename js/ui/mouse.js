@@ -55,7 +55,7 @@ stage.addEventListener('pointermove', (e) => {
     const t = effectiveTool(e);
     S.hover = ['select', 'direct', 'eyedropper', 'addAnchor', 'convert', 'rotate'].includes(t) ? (hitItem(p) || {}).it?.id || null : null;
     S.penHint = t === 'pen' ? penHint(p, e.altKey, sp) : '';
-    S.snapViz = ['pen', 'rect', 'ellipse', 'line'].includes(t) && !e.shiftKey ? snapPoint(p, cachedCands()).viz : null;
+    S.snapViz = ['pen', 'rect', 'roundRect', 'ellipse', 'line'].includes(t) && !e.shiftKey ? snapPoint(p, cachedCands()).viz : null;
     // 回転ハンドルにマウスが乗ったら緑
     const oh = SEL_TOOLS.has(t) && typeof findHinge === 'function' && S.foldHinge && findHinge(S.foldHinge);
     const hd = oh && hitFoldHandle(oh, (w) => toScr(P(w.x, w.y)), sp);

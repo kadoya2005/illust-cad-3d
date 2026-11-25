@@ -255,6 +255,7 @@ const Tools = {
   },
 
   rect: shapeTool('rect'),
+  roundRect: shapeTool('roundRect'),
   ellipse: shapeTool('ellipse'),
   line: shapeTool('line'),
 

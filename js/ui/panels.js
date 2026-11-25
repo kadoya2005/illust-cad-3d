@@ -67,6 +67,7 @@ function updateUI() {
   cleanSel(); ensureActiveLayer();
   const items = selectedItems();
   if (items.length) { const it = items[items.length - 1]; S.fill = it.fill; S.stroke = it.stroke; S.sw = it.sw; }
+  document.querySelectorAll('[data-group]').forEach((b) => setGroupSlot(b, S.tool));   // M キーなどでグループの中のツールにしたら、ボタンの絵も替える
   document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === S.tool));
   setSwatch($('swFill'), S.fill); setSwatch($('swStroke'), S.stroke);
   $('colorWell').classList.toggle('strokeActive', S.activeColor === 'stroke');
@@ -263,8 +264,55 @@ $('swStroke').addEventListener('click', () => { if (S.activeColor === 'stroke') 
 $('btnDefault').addEventListener('click', defaultColors);
 $('btnSwap').addEventListener('click', swapColors);
 $('btnNone').addEventListener('click', () => setColor(S.activeColor, null));
+// ツールのグループ（イラレと同じく、ボタンを長押し・右クリックで中のツールを選ぶ。選んだツールがボタンに出る）
+const TOOL_GROUPS = {
+  rect: [
+    ['rect', '<svg viewBox="0 0 20 20"><rect x="3.5" y="5" width="13" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>'],
+    ['roundRect', '<svg viewBox="0 0 20 20"><rect x="3.5" y="5" width="13" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>'],
+  ],
+};
+function setGroupSlot(b, t) {
+  const g = TOOL_GROUPS[b.dataset.group], ent = g && g.find(([id]) => id === t);
+  if (!ent || b.dataset.tool === t) return;
+  const m = TOOLS_META[t];
+  b.dataset.tool = t; b.innerHTML = ent[1];
+  b.title = `${m.name}${m.key ? ` (${m.key})` : ''}　長押しでほかのツール`;
+}
+function closeFlyout() { const f = document.querySelector('.flyout'); if (f) f.remove(); }
+function openFlyout(b) {
+  closeFlyout();
+  const f = document.createElement('div');
+  f.className = 'flyout';
+  for (const [id, icon] of TOOL_GROUPS[b.dataset.group]) {
+    const m = TOOLS_META[id], x = document.createElement('button');
+    x.innerHTML = `${icon}<span>${m.name}</span>${m.key ? `<span class="unit">${m.key}</span>` : ''}`;
+    x.dataset.flyTool = id;
+    x.classList.toggle('on', id === b.dataset.tool);
+    x.addEventListener('pointerup', () => { setGroupSlot(b, id); closeFlyout(); setTool(id); });
+    f.appendChild(x);
+  }
+  const r = b.getBoundingClientRect();
+  f.style.left = r.right + 2 + 'px'; f.style.top = r.top - 3 + 'px';
+  document.body.appendChild(f);
+}
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.flyout') && !e.target.closest('.grp')) closeFlyout(); });
+document.querySelectorAll('[data-group]').forEach((b) => {
+  let timer = null;
+  b.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    delete b.dataset.held;
+    closeFlyout();
+    timer = setTimeout(() => { timer = null; b.dataset.held = '1'; openFlyout(b); }, 400);
+  });
+  const stop = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  b.addEventListener('pointerup', stop); b.addEventListener('pointerleave', stop);
+  b.addEventListener('contextmenu', (e) => { e.preventDefault(); stop(); openFlyout(b); });
+});
 document.querySelectorAll('[data-tool]').forEach((b) => {
-  b.addEventListener('click', () => setTool(b.dataset.tool));
+  b.addEventListener('click', () => {
+    if (b.dataset.held) { delete b.dataset.held; return; }   // 長押しのあとのクリックは無視（メニューを開いたまま）
+    setTool(b.dataset.tool);
+  });
   // ツールのダブルクリックで数値入力（イラレと同じ）
   b.addEventListener('dblclick', () => {
     const t = b.dataset.tool;

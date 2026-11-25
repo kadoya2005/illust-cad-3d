@@ -168,6 +168,11 @@
       return ok1 && !F('box').plane && maxDiff([F('box').subs[0].nodes.map((n) => [n.x, n.y, 0])], [JSON.parse(before).subs[0].nodes.map((n) => [n.x, n.y, 0])]) < 1e-6
         && near(F('box').x3d.z0, 0, 1e-6);
     }],
+    ['角丸長方形：アンカー8個、角丸は幅・高さの半分まで、半径0なら普通の長方形', () => {
+      const a = roundRectFit(10, 20, 40, 30, 5), b = roundRectFit(10, 20, 40, 10, 99), c = roundRectFit(10, 20, 40, 30, 0);
+      return a.nodes.length === 8 && a.closed && near(a.nodes[0].x, 15) && near(a.nodes[0].y, 20) && near(a.nodes[2].x, 50) && near(a.nodes[2].y, 25)
+        && near(b.nodes[0].x, 15) && near(b.nodes[2].y, 25) && c.nodes.length === 4;
+    }],
   ];
 
   function run() {

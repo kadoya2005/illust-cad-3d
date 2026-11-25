@@ -94,6 +94,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (k.startsWith('Arrow')) {
     e.preventDefault();
+    if (roundRectKey(k, sh)) return;
     const st = sh ? S.keyStep * 10 : S.keyStep;
     nudge(k === 'ArrowLeft' ? -st : k === 'ArrowRight' ? st : 0, k === 'ArrowUp' ? -st : k === 'ArrowDown' ? st : 0, alt);
     return;
