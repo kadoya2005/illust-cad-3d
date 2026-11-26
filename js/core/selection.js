@@ -43,4 +43,4 @@ function afterSelect() {
   if (items.length) S.activeLayer = findItem(items[items.length - 1].id).layer.id;
 }
 function selectAll() { S.sel.clear(); editableItemsTopDown().forEach((it) => selItem(it, true)); drawOverlay(); updateUI(); }
-function deselectAll() { S.sel.clear(); S.selGuide = null; drawOverlay(); updateUI(); }
+function deselectAll() { S.sel.clear(); S.selGuide = null; if (S.selDims) S.selDims.clear(); drawOverlay(); updateUI(); }

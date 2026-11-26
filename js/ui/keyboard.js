@@ -85,9 +85,10 @@ document.addEventListener('keydown', (e) => {
     if (ok) e.preventDefault();
     return;
   }
-  if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); deleteSelection(); return; }
+  if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); if (!deleteSelectedDims()) deleteSelection(); return; }
   if (k === 'Enter' || k === 'Escape') {
     if (S.drawing) { e.preventDefault(); endDrawing(); }
+    else if (k === 'Escape' && S.dimDraft) { S.dimDraft = null; drawOverlay(); }
     else if (k === 'Escape') { closeMenus(); if (S.foldHinge) { S.foldHinge = null; render(); updateUI(); } }   // オレンジの折り線を外す
     else if (SEL_TOOLS.has(S.tool) && S.sel.size) { e.preventDefault(); openXfDialog('move'); }   // イラレと同じく Enter で「移動」
     return;

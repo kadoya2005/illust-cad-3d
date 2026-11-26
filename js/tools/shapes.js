@@ -129,6 +129,7 @@ function setTool(t) {
   if (!TOOLS_META[t]) return;
   if (S.drawing && t !== 'pen' && t !== 'hand' && t !== 'zoom') endDrawing();
   S.tool = t;
+  if (t !== 'dim') S.dimDraft = null;
   if (SEL_TOOLS.has(t)) S.lastSelTool = t;
   if (!XF_TOOLS.has(t)) S.xfOrigin = null;
   S.hover = null; S.penHint = ''; S.snapViz = null;
@@ -147,13 +148,15 @@ const ARROW_PTS = '2,2 2,19 6.5,15 9.5,21.5 12.2,20.3 9.3,14 15,14';
 const SELECT_CURSOR = svgCursor(`<polygon points="${ARROW_PTS}" fill="#000" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>`, 2, 2, 'default');
 const DIRECT_CURSOR = svgCursor(`<polygon points="${ARROW_PTS}" fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/>`, 2, 2, 'default');
 // バウンディングボックスの角の外：回転のカーソル（曲がった両矢印）。角の向きに合わせて回す
-const ROTATE_CURSORS = {};
+const ROTATE_CURSORS = {}, ROTATE3D_CURSORS = {};
 for (const [id, deg] of Object.entries({ ne: 0, se: 90, sw: 180, nw: 270 })) {
   const arc = '<path d="M5,9 Q15,9 15,19" fill="none" stroke="STK" stroke-width="SW"/>'
     + '<polygon points="5,5 5,13 1,9" fill="STK" stroke="STK" stroke-width="SW2"/>'
     + '<polygon points="11,19 19,19 15,23" fill="STK" stroke="STK" stroke-width="SW2"/>';
   const layer = (stk, sw, sw2) => arc.replace(/STK/g, stk).replace(/SW2/g, sw2).replace(/SW/g, sw);
   ROTATE_CURSORS[id] = svgCursor(`<g transform="rotate(${deg} 12 12)">${layer('#fff', 4, 2.5)}${layer('#000', 1.5, 0.5)}</g>`, 12, 12, 'crosshair');
+  // 正面図・側面図で立体を回すとき（3D の回転）はオレンジ
+  ROTATE3D_CURSORS[id] = svgCursor(`<g transform="rotate(${deg} 12 12)">${layer('#fff', 4.5, 3)}${layer(COL_ROT, 2, 0.8)}</g>`, 12, 12, 'crosshair');
 }
 function overRotate(t) {
   if (S.drag) return S.drag.type === 'bbRotate' ? S.drag.corner : null;

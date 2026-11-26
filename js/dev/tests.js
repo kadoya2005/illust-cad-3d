@@ -168,6 +168,55 @@
       return ok1 && !F('box').plane && maxDiff([F('box').subs[0].nodes.map((n) => [n.x, n.y, 0])], [JSON.parse(before).subs[0].nodes.map((n) => [n.x, n.y, 0])]) < 1e-6
         && near(F('box').x3d.z0, 0, 1e-6);
     }],
+    ['三面図：箱（30×20×10）の正面図は 4 本、平面図は 4 本、右側面図は 4 本の線。尺度 1:1 で正面図の幅 30', () => {
+      useDoc([sq('box', 100, 100, 30, 20, { x3d: { z0: 0, h: 10 } })]);
+      doc.layers.push({ id: 'D', name: '図面', color: '#e0559a', visible: true, locked: false, drawing: true, items: [], dims: [] });
+      doc.sheet = { x: 300, y: 0, size: 'A4', scale: 1, layer: 'D' };
+      SHEET_CACHE = null;
+      const me = modelEdges(), uniq = (v) => new Set(me.edges[v].map(([a, b]) => { const p = proj2(v, a), q = proj2(v, b); const k1 = p.map((c) => c.toFixed(3)).join(), k2 = q.map((c) => c.toFixed(3)).join(); return k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1; })).size;
+      const lay = sheetLayout(), w = lay.map('front', [130, 100, 0]).x - lay.map('front', [100, 100, 0]).x;
+      return uniq('front') === 4 && uniq('top') === 4 && uniq('side') === 4 && near(w, 30) && lay.s === 1;
+    }],
+    ['三面図：円柱は正面図に左右の輪郭線が出る（幅 = 直径）', () => {
+      useDoc([{ ...sq('cyl', 0, 0), subs: [ellipseSub(50, 50, 10, 10)], x3d: { z0: 0, h: 20 } }]);
+      SHEET_CACHE = null;
+      const xs = modelEdges().edges.front.flatMap(([a, b]) => (Math.abs(a[2] - b[2]) > 19 ? [a[0], b[0]] : []));
+      return xs.length >= 2 && near(Math.min(...xs), 40, 0.05) && near(Math.max(...xs), 60, 0.05);
+    }],
+    ['図面レイヤーの立体は 3D・STL に出ない。寸法はアンカーに付いてくる', () => {
+      useDoc([sq('a', 0, 0, 30, 30, { x3d: { z0: 0, h: 5 } })]);
+      doc.layers.push({ id: 'D', name: '図面', color: '#e0559a', visible: true, locked: false, drawing: true, items: [sq('n', 0, 0, 10, 10, { x3d: { z0: 0, h: 5 } })], dims: [] });
+      const ok1 = visibleSolids().length === 1 && visibleSolids()[0].id === 'a';
+      const d = { id: 'd1', dir: 'h', off: -10, a: P(0, 0), b: P(30, 0), ra: { k: 'node', id: 'a', s: 0, i: 0 }, rb: { k: 'node', id: 'a', s: 0, i: 1 } };
+      doc.layers[1].dims.push(d);
+      const v1 = dimGeom(d).len;
+      F('a').subs[0].nodes[1].x = 45; F('a').subs[0].nodes[2].x = 45;
+      const v2 = dimGeom(d).len;
+      F('a').subs[0].nodes.splice(1, 3);
+      const g3 = dimGeom(d);
+      return ok1 && near(v1, 30) && near(v2, 45) && !g3.ok;
+    }],
+    ['三面図の寸法：箱の角に付けた寸法は、箱を伸ばすと数値も直る（尺度 1:2 でも実寸）', () => {
+      useDoc([sq('box', 100, 100, 30, 20, { x3d: { z0: 0, h: 10 } })]);
+      doc.layers.push({ id: 'D', name: '図面', color: '#e0559a', visible: true, locked: false, drawing: true, items: [], dims: [] });
+      doc.sheet = { x: 300, y: 0, size: 'A4', scale: 0.5, layer: 'D' };
+      SHEET_CACHE = null;
+      const cs = sheetCands(), lay = sheetLayout();
+      const at = (w) => { const p = lay.map('front', w); return cs.find((c) => c.ref.v === 'front' && near(c.x, p.x) && near(c.y, p.y)); };
+      const A = at([100, 120, 0]), B = at([130, 120, 0]);
+      const d = { id: 'd1', dir: 'h', off: 10, a: P(A.x, A.y), b: P(B.x, B.y), ra: A.ref, rb: B.ref };
+      doc.layers[1].dims.push(d);
+      const v1 = dimGeom(d).len;
+      for (const n of F('box').subs[0].nodes) if (n.x > 120) n.x = 145;
+      SHEET_CACHE = null;
+      const g = dimGeom(d);
+      return !!(A && B && A.ref.an) && near(v1, 30) && g.ok && near(g.len, 45);
+    }],
+    ['寸法の向き：上下に出すと水平、左右に出すと垂直', () => {
+      const a = P(0, 0), b = P(30, 20);
+      const h = dimFromPlace(a, b, P(15, -10)), v = dimFromPlace(a, b, P(40, 10)), s = dimFromPlace(a, b, P(0, -5), true);
+      return h.dir === 'h' && near(h.off, -10) && v.dir === 'v' && near(v.off, 40) && s.dir === 'a';
+    }],
     ['角丸長方形：アンカー8個、角丸は幅・高さの半分まで、半径0なら普通の長方形', () => {
       const a = roundRectFit(10, 20, 40, 30, 5), b = roundRectFit(10, 20, 40, 10, 99), c = roundRectFit(10, 20, 40, 30, 0);
       return a.nodes.length === 8 && a.closed && near(a.nodes[0].x, 15) && near(a.nodes[0].y, 20) && near(a.nodes[2].x, 50) && near(a.nodes[2].y, 25)
@@ -176,14 +225,14 @@
   ];
 
   function run() {
-    const saved = { doc, sel: S.sel, hinge: S.foldHinge, active: S.activeLayer, smart: S.smart };
+    const saved = { doc, sheetCache: SHEET_CACHE, sel: S.sel, hinge: S.foldHinge, active: S.activeLayer, smart: S.smart };
     const results = [];
     for (const [name, fn] of TESTS) {
       let ok = false, err = '';
       try { ok = !!fn(); } catch (e) { err = String(e && e.message || e); }
       results.push({ name, ok, err });
     }
-    doc = saved.doc; S.sel = saved.sel; S.foldHinge = saved.hinge; S.activeLayer = saved.active; S.smart = saved.smart; S.drag = null;
+    doc = saved.doc; SHEET_CACHE = null; S.sel = saved.sel; S.foldHinge = saved.hinge; S.activeLayer = saved.active; S.smart = saved.smart; S.drag = null;
     render(); updateUI();
     const pass = results.filter((r) => r.ok).length;
     const box = document.createElement('div');

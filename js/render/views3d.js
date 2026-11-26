@@ -136,7 +136,7 @@ function renderViews() {
   if (document.body.classList.contains('no3d')) return;
   if (!initViews3d()) return;
   const solids = visibleSolids();
-  const flats = visibleLeaves().filter((it) => !extrudeOf(it));
+  const flats = modelLeaves().filter((it) => !extrudeOf(it));   // 図面レイヤーのものは出さない
   const scene = V3.scene;
   // 立体：いま見えているものだけ置く（消えたものは片付ける）
   const live = new Set(solids.map((it) => it.id));
@@ -168,7 +168,7 @@ function renderViews() {
   }
 
   // 大きさ：アートボードと形が入るように（2枚とも同じ縮尺）
-  const wr = worldRange(visibleLeaves());   // 3D の範囲（正面・側面に置いたパスも入れる）
+  const wr = worldRange(modelLeaves());   // 3D の範囲（正面・側面に置いたパスも入れる）
   const zMax = Math.max(X3D_DEFAULT_H, wr ? wr.z1 : 0), zMin = Math.min(0, wr ? wr.z0 : 0);
   const xr = [Math.min(0, wr ? wr.x0 : 0), Math.max(doc.width, wr ? wr.x1 : 0)];
   const yr = [Math.min(0, wr ? wr.y0 : 0), Math.max(doc.height, wr ? wr.y1 : 0)];
@@ -265,7 +265,7 @@ const hSign = (id) => (id === 'viewFront' ? 1 : -1);
 function hitFlat(id, q) {
   const vw = V3.views[id], r = vw.box.getBoundingClientRect();
   let best = null, bd = 5;
-  for (const it of visibleLeaves()) {
+  for (const it of modelLeaves()) {
     if (extrudeOf(it)) continue;
     for (const sb of it.subs) {
       if (sb.nodes.length < 2) continue;
@@ -313,13 +313,18 @@ function viewBox(id) {
     x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
   }
   // ハンドル（伸び縮み・押し出し）が使えるのは、床に平らなものを真横から見ているときだけ
-  return { x0, x1, y0, y1, ...sr, handles: sr.planar && editable(id) };
+  const handles = sr.planar && editable(id);
+  // 押し出せる面（閉じたパスで、まだ押し出していない平らなもの）を選んでいるか
+  const arrow = handles && (V3.arrowActive === id || y1 - y0 < 1) && sr.items.some((it) => !extrudeOf(it) && it.subs.some((sb) => sb.closed && sb.nodes.length >= 3));
+  return { x0, x1, y0, y1, ...sr, handles, arrow };
 }
+const EX_ARROW = 30;   // 押し出しの矢印の長さ（px）
 const VB_HANDLES = (b) => {
   const mx = (b.x0 + b.x1) / 2, my = (b.y0 + b.y1) / 2;
   // 平らなもの（高さ 0）は上の取っ手だけ（引き上げると押し出し）
   const flat = b.y1 - b.y0 < 1;
-  const hs = { n: [mx, b.y0], e: [b.x1, my], w: [b.x0, my] };
+  // 押し出せる平らな面：上の取っ手は、上向きの矢印（→）の先。矢印を引くと押し出し
+  const hs = { n: [mx, b.arrow ? b.y0 - EX_ARROW : b.y0], e: [b.x1, my], w: [b.x0, my] };
   if (!flat) Object.assign(hs, { nw: [b.x0, b.y0], ne: [b.x1, b.y0], sw: [b.x0, b.y1], se: [b.x1, b.y1], s: [mx, b.y1] });
   return hs;
 };
@@ -329,9 +334,9 @@ function foldHandlesSvg(oh, sc, hover, active) {
   const m = sc(toWorld(planeOf(oh.A), vlerp(oh.e.a, oh.e.b, 0.5)));
   let h = '';
   for (const hd of hingeHandles(oh)) {
-    const s = sc(hd.w), col = active === hd.face.id ? '#2f7bff' : hover === hd.face.id ? '#2fbf4f' : '#ff8c1a';
+    const s = sc(hd.w), on = hover === hd.face.id || active === hd.face.id, col = on ? COL_ROT_HOT : COL_ROT;   // 回す＝オレンジ（乗せる・引いている間は濃く大きく）
     h += `<line x1="${m.x}" y1="${m.y}" x2="${s.x}" y2="${s.y}" stroke="${col}" stroke-width="1.5" stroke-dasharray="3 2"/>`;
-    h += `<circle cx="${s.x}" cy="${s.y}" r="6" fill="${col}" stroke="#fff" stroke-width="2"/>`;
+    h += `<circle cx="${s.x}" cy="${s.y}" r="${on ? 8 : 6}" fill="${col}" stroke="#fff" stroke-width="2"/>`;
   }
   return h;
 }
@@ -353,7 +358,7 @@ function viewFoldSvg(id) {
       const ff = findItem(id); if (!ff) continue;
       const it2 = ff.item, pl2 = planeOf(it2);
       const pts2 = polyFromSub(it2.subs[0]).map((p) => sc(toWorld(pl2, p)));
-      h += `<polygon points="${pts2.map((p) => p.x + ',' + p.y).join(' ')}" fill="${g.active ? '#2f7bff' : '#2fbf4f'}" fill-opacity="0.18" stroke="none"/>`;
+      h += `<polygon points="${pts2.map((p) => p.x + ',' + p.y).join(' ')}" fill="${COL_MOVE}" fill-opacity="${g.active ? 0.3 : 0.18}" stroke="none"/>`;
     }
   }
   if (oh && f) {
@@ -361,7 +366,7 @@ function viewFoldSvg(id) {
     if (a && b) {
       const pts = [];
       for (let k = 0; k <= 12; k++) pts.push(sc(toWorld(pl, cubicAt(a, a.hout || a, b.hin || b, b, k / 12))));
-      h += `<polyline points="${pts.map((p) => p.x + ',' + p.y).join(' ')}" fill="none" stroke="${g.active ? '#2f7bff' : '#2fbf4f'}" stroke-width="3" stroke-linecap="round"/>`;
+      h += `<polyline points="${pts.map((p) => p.x + ',' + p.y).join(' ')}" fill="none" stroke="${COL_MOVE}" stroke-width="${g.active ? 5 : 3}" stroke-linecap="round"/>`;
     }
   }
   return h;
@@ -373,7 +378,17 @@ function drawViewBox(id) {
   if (!b || S.hideEdges) { svg.innerHTML = nodes; return; }
   const col = findItem(b.items[0].id).layer.color;
   let h = nodes + `<rect x="${b.x0}" y="${b.y0}" width="${Math.max(0, b.x1 - b.x0)}" height="${Math.max(0, b.y1 - b.y0)}" fill="none" stroke="${col}" stroke-width="1"/>`;
-  if (b.handles) for (const [x, y] of Object.values(VB_HANDLES(b))) h += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="#fff" stroke="${col}" stroke-width="1"/>`;
+  if (b.handles) for (const [k, [x, y]] of Object.entries(VB_HANDLES(b))) {
+    if (k === 'n' && b.arrow) {
+      // 押し出しの向きの矢印：面から上へ。先の三角をつかんで引き上げる
+      const hot = V3.arrowHover === id || V3.arrowActive === id;
+      const c = COL_MOVE, y0 = b.y0, wdt = V3.arrowActive === id ? 3 : hot ? 2.5 : 2;   // 押し出し＝動かす＝緑（引いている間も緑のまま、太く）
+      h += `<line x1="${x}" y1="${y0}" x2="${x}" y2="${y + 6}" stroke="${c}" stroke-width="${wdt}"/>`
+        + `<path d="M${x} ${y - (hot ? 5 : 3)}L${x - (hot ? 9 : 7)} ${y + 8}L${x + (hot ? 9 : 7)} ${y + 8}Z" fill="${c}" stroke="#fff" stroke-width="1" stroke-linejoin="round"/>`;
+      continue;
+    }
+    h += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="#fff" stroke="${col}" stroke-width="1"/>`;
+  }
   svg.innerHTML = h;
 }
 // この図の向きの平面か（正面図なら正面の板、側面図なら側面の板。奥行きはどこでもよい）
@@ -481,7 +496,10 @@ function hitViewHandle(id, q) {
   const b = viewBox(id);
   if (!b || !b.handles) return null;
   let best = null, bd = 6;
-  for (const [k, [x, y]] of Object.entries(VB_HANDLES(b))) { const d = Math.hypot(x - q.x, y - q.y); if (d < bd) { bd = d; best = k; } }
+  for (const [k, [x, y]] of Object.entries(VB_HANDLES(b))) {
+    const d = Math.hypot(x - q.x, y - q.y) - (k === 'n' && b.arrow ? 4 : 0);   // 矢印の先は少し広くつかめる
+    if (d < bd) { bd = d; best = k; }
+  }
   return best;
 }
 const insideViewBox = (id, q) => { const b = viewBox(id); return !!b && q.x >= b.x0 - 3 && q.x <= b.x1 + 3 && q.y >= b.y0 - 3 && q.y <= b.y1 + 3; };
@@ -590,6 +608,8 @@ function startViewXf(id, kind, handle, q) {
       snap: new Map(items.map((it) => [it.id, clone({ subs: it.subs, plane: it.plane || null, fold: it.fold || null, x3d: it.x3d || null })])) };
   }
   if (!sr.planar || !editable(id)) return null;
+  const vb = viewBox(id);
+  V3.arrowActive = handle === 'n' && vb && vb.arrow ? id : null;   // 矢印を引いている間は、立体の上に矢印を出したまま
   return {
     type: 'vxf', kind, handle, view: id, s: q, sr, moved: false,
     subs: new Map(sr.items.map((it) => [it.id, clone(it.subs)])),   // 箱ごと動かすこともあるので、選んだものだけでなく対象全部
@@ -884,6 +904,7 @@ for (const v of VIEWS) {
   const end = (e) => {
     if (!drag) return;
     const cancel = e && e.type === 'pointercancel';
+    V3.arrowActive = null;
     if (cancel) {
       // 途中で中断された（ほかの窓に切り替わった、など）：元に戻して終わる
       if (drag.type === 'fold' && drag.undo) restoreFolds(drag.undo);
@@ -930,7 +951,7 @@ function updateViewsCursor() {
     el.style.cursor = zoom ? (S.keys.alt ? 'zoom-out' : 'zoom-in')
       : S.spaceDown ? (S.keys.shift ? ROTATE_CURSORS.ne : 'grab')
       : S.tool === 'hand' ? 'grab'
-      : hv === 'grab' ? 'grab' : hv && hv.startsWith('rot-') ? ROTATE_CURSORS[hv.slice(4)] : HANDLE_CURSORS[hv] || (S.tool === 'pen' && !S.keys.ctrl ? 'crosshair' : SELECT_CURSOR);
+      : hv === 'grab' ? 'grab' : hv && hv.startsWith('rot-') ? ROTATE3D_CURSORS[hv.slice(4)] : HANDLE_CURSORS[hv] || (S.tool === 'pen' && !S.keys.ctrl ? 'crosshair' : SELECT_CURSOR);
   }
 }
 function hoverView(id, q) {
@@ -938,6 +959,8 @@ function hoverView(id, q) {
   const busy = S.spaceDown || S.tool === 'zoom' || S.tool === 'hand';
   const rz = busy || !SEL_TOOLS.has(S.tool) ? null : !hitViewHandle(id, q) && hitViewRotate(id, q);
   $(id).dataset.hover = busy ? '' : hitViewHandle(id, q) || (rz ? 'rot-' + rz : '');
+  const ah = !busy && hitViewHandle(id, q) === 'n' && (viewBox(id) || {}).arrow ? id : null;   // 押し出しの矢印にマウスが乗ったら青
+  if (ah !== (V3.arrowHover || null)) { V3.arrowHover = ah; drawViewBox(id); }
   // オレンジの折り線があるとき、つかめる線にマウスが乗ったら緑
   const oh = S.foldHinge && !S.spaceDown && SEL_TOOLS.has(S.tool) && findHinge(S.foldHinge);
   const hd = oh ? hitFoldHandle(oh, (w) => localToViewW(id, w), q) : null;

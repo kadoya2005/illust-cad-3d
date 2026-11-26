@@ -38,7 +38,7 @@ function removeExtrude() {
   render(); commit();
 }
 // 表示されている押し出し（隠したもの・隠したレイヤーは除く）
-function visibleSolids() { return visibleLeaves().filter(extrudeOf); }
+function visibleSolids() { return modelLeaves().filter(extrudeOf); }   // 図面レイヤーのものは除く
 
 // ---- 断面を折れ線の輪郭にする（外形と穴を組にする） ----
 // 戻り値：[{ outer: [P...], holes: [[P...], ...] }]。外形は反時計回り、穴は時計回り（y を上向きにしたとき）

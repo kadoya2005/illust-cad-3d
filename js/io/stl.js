@@ -30,7 +30,7 @@ function buildSTL(items) {
 async function exportStlFile() {
   if (S.drawing) endDrawing();
   // 選んでいる押し出しがあればそれだけ、なければ見えている押し出しすべて
-  const sel = selectedItems().filter(extrudeOf);
+  const sel = selectedItems().filter((it) => extrudeOf(it) && !isDrawingLayer(layerOfItem(it)));   // 図面レイヤーのものは出さない
   const items = sel.length ? sel : visibleSolids();
   if (!items.length) { toast('押し出した立体がありません。パスを選んで、パネルの「3D 押し出し」で高さを入れてください'); return; }
   const { buf, count } = buildSTL(items);

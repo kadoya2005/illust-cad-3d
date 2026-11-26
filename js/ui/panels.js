@@ -63,8 +63,18 @@ document.querySelectorAll('[data-menu]').forEach((btn) => btn.addEventListener('
 }));
 document.addEventListener('click', (e) => { if (!e.target.closest('.dropdown') && !e.target.closest('[data-menu]')) closeMenus(); });
 
+function updateDrawingPanel() {
+  const sh = doc.sheet;
+  $('btnSheet').textContent = sh ? '三面図の紙を消す' : '三面図の紙を作る';
+  $('sheetOpts').style.display = sh ? '' : 'none';
+  if (sh) { $('sheetSize').value = sh.size; $('sheetScale').value = String(sh.scale); }
+}
+$('btnSheet').addEventListener('click', () => toggleSheet());
+$('sheetSize').addEventListener('change', (e) => { if (doc.sheet) { doc.sheet.size = e.target.value; render(); commit(); } e.target.blur(); });
+$('sheetScale').addEventListener('change', (e) => { if (doc.sheet) { const v = e.target.value; doc.sheet.scale = v === 'auto' ? 'auto' : +v; render(); commit(); } e.target.blur(); });
 function updateUI() {
   cleanSel(); ensureActiveLayer();
+  updateDrawingPanel();
   const items = selectedItems();
   if (items.length) { const it = items[items.length - 1]; S.fill = it.fill; S.stroke = it.stroke; S.sw = it.sw; }
   document.querySelectorAll('[data-group]').forEach((b) => setGroupSlot(b, S.tool));   // M キーなどでグループの中のツールにしたら、ボタンの絵も替える
@@ -135,7 +145,7 @@ let LAYERS_SIG = '';
 function renderLayers() {
   const ul = $('layerList');
   // 変わっていなければ作り直さない（ドラッグ中に毎回作り直すと重くなる）
-  const sig = S.activeLayer + '|' + doc.layers.map((L) => [L.id, L.name, L.color, L.visible, L.locked, leaves(L.items).some((it) => S.sel.has(it.id))].join(',')).join('/');
+  const sig = S.activeLayer + '|' + doc.layers.map((L) => [L.id, L.name, L.color, L.visible, L.locked, !!L.drawing, leaves(L.items).some((it) => S.sel.has(it.id))].join(',')).join('/');
   if (sig === LAYERS_SIG && ul.children.length === doc.layers.length && !ul.querySelector('.nmEdit')) return;
   if (ul.querySelector('.nmEdit')) return;   // 名前を書き換えている最中は触らない
   LAYERS_SIG = sig;
@@ -149,6 +159,7 @@ function renderLayers() {
     li.innerHTML = `<span class="chip" style="background:${L.color}"></span>` +
       `<button class="ib eye ${L.visible ? '' : 'off'}" title="表示／非表示">${ICON_EYE}</button>` +
       `<button class="ib lock ${L.locked ? '' : 'off'}" title="ロック／解除">${ICON_LOCK}</button>` +
+      `<button class="ib draw ${L.drawing ? '' : 'off'}" title="図面レイヤー（寸法・三面図用。中のものは 3D・STL に出ない）">図</button>` +
       `<span class="nm"></span>` +
       `<span class="selmark" style="${hasSel ? 'background:' + L.color : ''}"></span>`;
     li.querySelector('.nm').textContent = L.name;
@@ -185,6 +196,12 @@ $('layerList').addEventListener('click', (e) => {
   if (!L) return;
   if (e.target.closest('.eye')) { L.visible = !L.visible; cleanSel(); render(); commit(); return; }
   if (e.target.closest('.lock')) { L.locked = !L.locked; cleanSel(); render(); commit(); return; }
+  if (e.target.closest('.draw')) {
+    L.drawing = !L.drawing;
+    if (L.drawing && !L.dims) L.dims = [];
+    toast(L.drawing ? `「${L.name}」を図面レイヤーにしました（中のものは 3D・STL に出ません）` : `「${L.name}」をふつうのレイヤーに戻しました`);
+    render(); commit(); return;
+  }
   S.activeLayer = L.id; updateUI();
 });
 $('layerAdd').addEventListener('click', () => {

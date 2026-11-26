@@ -124,6 +124,7 @@ button.small { padding: 1px 6px; font-size: 11px; }
 #layerList li .nmEdit { flex: 1; min-width: 0; font: inherit; padding: 0 3px; }
 #layerList li .ib { width: 20px; height: 18px; padding: 0; background: none; border: none; color: var(--muted); }
 #layerList li .ib.off { opacity: .25; }
+#layerList li .ib.draw { font-size: 10px; font-weight: 700; color: #e0559a; }
 #layerList li .ib svg { width: 14px; height: 14px; display: block; margin: auto; }
 #layerList li .selmark { width: 8px; height: 8px; }
 
